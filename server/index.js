@@ -1,7 +1,17 @@
+require("dotenv").config();
 const express = require('express');
 const cors = require('cors');
-
+const healthRoutes = require('./routes/health.routes');
+const pool = require('./db');
+pool.query("SELECT NOW()")
+    .then(result => {
+        console.log("Database connected at:", result.rows[0].now);
+    })
+    .catch(err => {
+        console.error("Database connection error:", err);
+    });
 const app = express();
+app.use("/api", healthRoutes);
 // Allow requests from your React dev server (http://localhost:5173)
 app.use(
     cors({
@@ -11,13 +21,7 @@ app.use(
 
 // This lets Express read JSON bodies (later for POST requests)
 app.use(express.json());
-// A simple test route to confirm the API is running
-app.get("/api/health", (req, res) => {
-    res.json({
-        status: "ok",
-        message: "Staff Builder API is running",
-    });
-});
+
 
 const PORT = 5050;
 app.listen(PORT, () => {
