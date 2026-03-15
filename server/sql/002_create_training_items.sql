@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS training_items (
+id SERIAL PRIMARY KEY,
+category_id INT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+type TEXT NOT NULL,
+title TEXT NOT NULL,
+url TEXT,
+file_path TEXT,
+body TEXT,
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())
