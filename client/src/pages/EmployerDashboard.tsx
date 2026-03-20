@@ -94,6 +94,12 @@ function EmployerDashboard() {
     const [employeeEmail, setEmployeeEmail] = useState("");
     const [employeePassword, setEmployeePassword] = useState("");
 
+    const [inviteFullName, setInviteFullName] = useState("");
+    const [inviteEmail, setInviteEmail] = useState("");
+    const [inviteLoading, setInviteLoading] = useState(false);
+    const [inviteSuccessMessage, setInviteSuccessMessage] = useState("");
+    const [latestInviteLink, setLatestInviteLink] = useState("");
+
     const [assignmentUserId, setAssignmentUserId] = useState("");
     const [assignmentStaffCategoryId, setAssignmentStaffCategoryId] = useState("");
 
@@ -443,6 +449,65 @@ function EmployerDashboard() {
         } catch (err) {
             console.error("Create employee error:", err);
             setError("Something went wrong while creating employee");
+        }
+    }
+
+    async function inviteEmployee(e: React.FormEvent) {
+        e.preventDefault();
+        setError("");
+        setInviteSuccessMessage("");
+        setLatestInviteLink("");
+
+        const trimmedFullName = inviteFullName.trim();
+        const trimmedEmail = inviteEmail.trim().toLowerCase();
+
+        if (!trimmedFullName) {
+            setError("Employee full name is required");
+            return;
+        }
+
+        if (!trimmedEmail) {
+            setError("Employee email is required");
+            return;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(trimmedEmail)) {
+            setError("Please enter a valid employee email");
+            return;
+        }
+
+        try {
+            setInviteLoading(true);
+
+            const res = await fetch(`${apiBaseUrl}/api/employees/invite`, {
+                method: "POST",
+                headers: authHeaders(true),
+                body: JSON.stringify({
+                    full_name: trimmedFullName,
+                    email: trimmedEmail,
+                }),
+            });
+
+            const data = await handleJsonResponse(res);
+            if (!data) return;
+
+            if (!res.ok) {
+                setError(data.message || "Failed to invite employee");
+                return;
+            }
+
+            setInviteSuccessMessage("Employee invited successfully.");
+            setLatestInviteLink(`${window.location.origin}/set-password/${data.invite_token}`);
+            setInviteFullName("");
+            setInviteEmail("");
+
+            await loadEmployees();
+        } catch (err) {
+            console.error("Invite employee error:", err);
+            setError("Something went wrong while inviting employee");
+        } finally {
+            setInviteLoading(false);
         }
     }
 
@@ -882,528 +947,871 @@ function EmployerDashboard() {
         }
     }
 
+    function getItemIcon(type: string) {
+        switch (type) {
+            case "document":
+                return "📄";
+            case "video":
+                return "🎥";
+            case "link":
+                return "🔗";
+            case "text":
+                return "📝";
+            default:
+                return "📘";
+        }
+    }
+
     return (
-        <div style={{ padding: 24 }}>
-            <h1>Employer Dashboard</h1>
-            <p>Manage staff categories, employees, assignments, folders, training items, and completions.</p>
-
-            {error && <p style={{ color: "crimson" }}>{error}</p>}
-
-            <div style={{ marginTop: 24 }}>
-                <h2>Staff Categories</h2>
-
-                <form onSubmit={createStaffCategory} style={{ marginBottom: 20 }}>
-                    <div style={{ marginBottom: 10 }}>
-                        <label>
-                            Category name
-                            <br />
-                            <input
-                                value={staffCategoryName}
-                                onChange={(e) => setStaffCategoryName(e.target.value)}
-                                placeholder="e.g. Manager"
-                            />
-                        </label>
+        <div className="min-h-[calc(100vh-160px)] bg-slate-950 px-6 py-14 text-white md:px-10">
+            <div className="mx-auto max-w-7xl">
+                <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                        <p className="mb-4 inline-block rounded-full border border-sky-500/30 bg-sky-500/10 px-4 py-1 text-sm font-medium text-sky-300">
+                            Employer workspace
+                        </p>
+                        <h1 className="text-4xl font-bold leading-tight md:text-5xl">
+                            Manage people, training, and progress in one place.
+                        </h1>
+                        <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300">
+                            Create staff categories, add or invite employees, assign role-based training,
+                            build folders, upload learning content, and track who completed what.
+                        </p>
                     </div>
 
-                    <div style={{ marginBottom: 10 }}>
-                        <label>
-                            Description
-                            <br />
-                            <input
-                                value={staffCategoryDescription}
-                                onChange={(e) => setStaffCategoryDescription(e.target.value)}
-                                placeholder="Training for managers"
-                            />
-                        </label>
-                    </div>
-
-                    <button type="submit">Create Staff Category</button>
-                </form>
-
-                {loadingCategories ? (
-                    <p>Loading staff categories...</p>
-                ) : staffCategories.length === 0 ? (
-                    <p>No staff categories yet.</p>
-                ) : (
-                    <ul>
-                        {staffCategories.map((category) => (
-                            <li key={category.id} style={{ marginBottom: 12 }}>
-                                <button
-                                    style={{ marginRight: 10 }}
-                                    onClick={() => loadFolders(category.id, category.name)}
-                                >
-                                    Open
-                                </button>
-
-                                <strong>{category.name}</strong>
-                                {category.description ? ` — ${category.description}` : ""}
-
-                                <button
-                                    style={{ marginLeft: 12 }}
-                                    onClick={() => deleteStaffCategory(category.id)}
-                                >
-                                    Delete
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </div>
-
-            <div style={{ marginTop: 32 }}>
-                <h2>Employees</h2>
-
-                <form onSubmit={createEmployee} style={{ marginBottom: 20 }}>
-                    <div style={{ marginBottom: 10 }}>
-                        <label>
-                            Full name
-                            <br />
-                            <input
-                                value={employeeFullName}
-                                onChange={(e) => setEmployeeFullName(e.target.value)}
-                                placeholder="Hooman"
-                            />
-                        </label>
-                    </div>
-
-                    <div style={{ marginBottom: 10 }}>
-                        <label>
-                            Email
-                            <br />
-                            <input
-                                type="email"
-                                value={employeeEmail}
-                                onChange={(e) => setEmployeeEmail(e.target.value)}
-                                placeholder="hooman@test.com"
-                            />
-                        </label>
-                    </div>
-
-                    <div style={{ marginBottom: 10 }}>
-                        <label>
-                            Temporary password
-                            <br />
-                            <input
-                                type="password"
-                                value={employeePassword}
-                                onChange={(e) => setEmployeePassword(e.target.value)}
-                                placeholder="123456"
-                            />
-                        </label>
-                    </div>
-
-                    <button type="submit">Create Employee</button>
-                </form>
-
-                {loadingEmployees ? (
-                    <p>Loading employees...</p>
-                ) : employees.length === 0 ? (
-                    <p>No employees yet.</p>
-                ) : (
-                    <ul>
-                        {employees.map((employee) => (
-                            <li key={employee.id} style={{ marginBottom: 10 }}>
-                                <strong>{employee.full_name}</strong> ({employee.email})
-                                <button
-                                    style={{ marginLeft: 12 }}
-                                    onClick={() => deleteEmployee(employee.id)}
-                                >
-                                    Delete
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </div>
-
-            <div style={{ marginTop: 32 }}>
-                <h2>Assignments</h2>
-
-                <form onSubmit={createAssignment} style={{ marginBottom: 20 }}>
-                    <div style={{ marginBottom: 10 }}>
-                        <label>
-                            Employee
-                            <br />
-                            <select
-                                value={assignmentUserId}
-                                onChange={(e) => setAssignmentUserId(e.target.value)}
-                            >
-                                <option value="">Select employee</option>
-                                {employees.map((employee) => (
-                                    <option key={employee.id} value={employee.id}>
-                                        {employee.full_name} ({employee.email})
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                    </div>
-
-                    <div style={{ marginBottom: 10 }}>
-                        <label>
-                            Staff category
-                            <br />
-                            <select
-                                value={assignmentStaffCategoryId}
-                                onChange={(e) => setAssignmentStaffCategoryId(e.target.value)}
-                            >
-                                <option value="">Select category</option>
-                                {staffCategories.map((category) => (
-                                    <option key={category.id} value={category.id}>
-                                        {category.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                    </div>
-
-                    <button type="submit">Assign Category</button>
-                </form>
-
-                {loadingAssignments ? (
-                    <p>Loading assignments...</p>
-                ) : assignments.length === 0 ? (
-                    <p>No assignments yet.</p>
-                ) : (
-                    <ul>
-                        {assignments.map((assignment) => (
-                            <li key={assignment.id} style={{ marginBottom: 10 }}>
-                                <strong>{assignment.employee_name}</strong> ({assignment.employee_email}) —{" "}
-                                {assignment.staff_category_name}
-                                <button
-                                    style={{ marginLeft: 12 }}
-                                    onClick={() => deleteAssignment(assignment.id)}
-                                >
-                                    Remove
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </div>
-
-            {selectedStaffCategoryId && (
-                <div style={{ marginTop: 32 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                        <h2 style={{ margin: 0 }}>Folders in {selectedStaffCategoryName}</h2>
-                        <button onClick={closeStaffCategory}>Close Category</button>
-                    </div>
-
-                    <form onSubmit={createFolder} style={{ marginBottom: 20 }}>
-                        <div style={{ marginBottom: 10 }}>
-                            <label>
-                                Folder name
-                                <br />
-                                <input
-                                    value={folderName}
-                                    onChange={(e) => setFolderName(e.target.value)}
-                                    placeholder="Leadership"
-                                />
-                            </label>
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
+                            <p className="text-sm text-slate-400">Employees</p>
+                            <p className="mt-2 text-3xl font-bold text-white">{employees.length}</p>
                         </div>
-
-                        <div style={{ marginBottom: 10 }}>
-                            <label>
-                                Description
-                                <br />
-                                <input
-                                    value={folderDescription}
-                                    onChange={(e) => setFolderDescription(e.target.value)}
-                                    placeholder="Leadership training files"
-                                />
-                            </label>
+                        <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
+                            <p className="text-sm text-slate-400">Categories</p>
+                            <p className="mt-2 text-3xl font-bold text-white">{staffCategories.length}</p>
                         </div>
+                        <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
+                            <p className="text-sm text-slate-400">Assignments</p>
+                            <p className="mt-2 text-3xl font-bold text-white">{assignments.length}</p>
+                        </div>
+                        <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
+                            <p className="text-sm text-slate-400">Completions</p>
+                            <p className="mt-2 text-3xl font-bold text-emerald-300">{completions.length}</p>
+                        </div>
+                    </div>
+                </div>
 
-                        <button type="submit">Create Folder</button>
-                    </form>
+                {error && (
+                    <div className="mb-8 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                        {error}
+                    </div>
+                )}
 
-                    {loadingFolders ? (
-                        <p>Loading folders...</p>
-                    ) : folders.length === 0 ? (
-                        <p>No folders in this category yet.</p>
-                    ) : (
-                        <ul>
-                            {folders.map((folder) => (
-                                <li key={folder.id} style={{ marginBottom: 14 }}>
-                                    {editingFolderId === folder.id ? (
-                                        <div>
-                                            <div style={{ marginBottom: 8 }}>
-                                                <input
-                                                    value={editFolderName}
-                                                    onChange={(e) => setEditFolderName(e.target.value)}
-                                                    placeholder="Folder name"
-                                                />
+                <div className="grid gap-8 xl:grid-cols-[1.05fr_1fr]">
+                    <div className="space-y-8">
+                        <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
+                            <div className="mb-6">
+                                <h2 className="text-2xl font-semibold text-white">Invite Employee</h2>
+                                <p className="mt-1 text-sm text-slate-400">
+                                    Send a secure setup link to a new employee.
+                                </p>
+                            </div>
+
+                            <form onSubmit={inviteEmployee} className="space-y-4">
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-slate-200">
+                                        Full Name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={inviteFullName}
+                                        onChange={(e) => setInviteFullName(e.target.value)}
+                                        placeholder="John Doe"
+                                        className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-sky-400"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-slate-200">
+                                        Email Address
+                                    </label>
+                                    <input
+                                        type="email"
+                                        value={inviteEmail}
+                                        onChange={(e) => setInviteEmail(e.target.value)}
+                                        placeholder="employee@company.com"
+                                        className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-sky-400"
+                                    />
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={inviteLoading}
+                                    className="w-full rounded-2xl bg-sky-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {inviteLoading ? "Sending Invite..." : "Send Invitation"}
+                                </button>
+                            </form>
+
+                            {inviteSuccessMessage && (
+                                <div className="mt-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+                                    {inviteSuccessMessage}
+                                </div>
+                            )}
+
+                            {latestInviteLink && (
+                                <div className="mt-4 rounded-2xl border border-sky-500/30 bg-sky-500/10 p-4">
+                                    <p className="mb-2 text-sm text-slate-200">Invite link for testing</p>
+                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                        <a
+                                            href={latestInviteLink}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="break-all text-sm text-sky-300"
+                                        >
+                                            {latestInviteLink}
+                                        </a>
+
+                                        <button
+                                            onClick={() => navigator.clipboard.writeText(latestInviteLink)}
+                                            className="rounded-xl border border-slate-700 px-3 py-2 text-sm text-white transition hover:border-slate-500 hover:bg-slate-800"
+                                        >
+                                            Copy
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </section>
+
+                        <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
+                            <div className="mb-6">
+                                <h2 className="text-2xl font-semibold text-white">Create Employee Manually</h2>
+                                <p className="mt-1 text-sm text-slate-400">
+                                    Create an employee directly with a password.
+                                </p>
+                            </div>
+
+                            <form onSubmit={createEmployee} className="grid gap-4 md:grid-cols-2">
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-slate-200">
+                                        Full Name
+                                    </label>
+                                    <input
+                                        value={employeeFullName}
+                                        onChange={(e) => setEmployeeFullName(e.target.value)}
+                                        placeholder="Hooman Abedi"
+                                        className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-sky-400"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-slate-200">
+                                        Email
+                                    </label>
+                                    <input
+                                        type="email"
+                                        value={employeeEmail}
+                                        onChange={(e) => setEmployeeEmail(e.target.value)}
+                                        placeholder="employee@test.com"
+                                        className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-sky-400"
+                                    />
+                                </div>
+
+                                <div className="md:col-span-2">
+                                    <label className="mb-2 block text-sm font-medium text-slate-200">
+                                        Temporary Password
+                                    </label>
+                                    <input
+                                        type="password"
+                                        value={employeePassword}
+                                        onChange={(e) => setEmployeePassword(e.target.value)}
+                                        placeholder="123456"
+                                        className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-sky-400"
+                                    />
+                                </div>
+
+                                <div className="md:col-span-2">
+                                    <button
+                                        type="submit"
+                                        className="w-full rounded-2xl border border-slate-700 px-5 py-3 font-semibold text-white transition hover:border-slate-500 hover:bg-slate-800"
+                                    >
+                                        Create Employee
+                                    </button>
+                                </div>
+                            </form>
+                        </section>
+
+                        <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
+                            <div className="mb-6">
+                                <h2 className="text-2xl font-semibold text-white">Employees</h2>
+                                <p className="mt-1 text-sm text-slate-400">
+                                    View and manage employees in this business.
+                                </p>
+                            </div>
+
+                            {loadingEmployees ? (
+                                <p className="text-slate-300">Loading employees...</p>
+                            ) : employees.length === 0 ? (
+                                <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 text-slate-400">
+                                    No employees yet.
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {employees.map((employee) => (
+                                        <div
+                                            key={employee.id}
+                                            className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/80 p-4 sm:flex-row sm:items-center sm:justify-between"
+                                        >
+                                            <div>
+                                                <p className="font-semibold text-white">{employee.full_name}</p>
+                                                <p className="mt-1 text-sm text-slate-400">{employee.email}</p>
                                             </div>
 
-                                            <div style={{ marginBottom: 8 }}>
-                                                <input
-                                                    value={editFolderDescription}
-                                                    onChange={(e) => setEditFolderDescription(e.target.value)}
-                                                    placeholder="Description"
-                                                />
-                                            </div>
-
-                                            <button onClick={() => saveEditFolder(folder.id)}>Save</button>
-                                            <button style={{ marginLeft: 8 }} onClick={cancelEditFolder}>
-                                                Cancel
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div>
                                             <button
-                                                style={{ marginRight: 10 }}
-                                                onClick={() => loadTrainingItems(folder.id, folder.name)}
-                                            >
-                                                Open
-                                            </button>
-
-                                            <strong>{folder.name}</strong>
-                                            {folder.description ? ` — ${folder.description}` : ""}
-
-                                            <button
-                                                style={{ marginLeft: 12 }}
-                                                onClick={() => startEditFolder(folder)}
-                                            >
-                                                Edit
-                                            </button>
-
-                                            <button
-                                                style={{ marginLeft: 8 }}
-                                                onClick={() => deleteFolder(folder.id)}
+                                                onClick={() => deleteEmployee(employee.id)}
+                                                className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20"
                                             >
                                                 Delete
                                             </button>
                                         </div>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </div>
-            )}
+                                    ))}
+                                </div>
+                            )}
+                        </section>
 
-            {selectedFolderId && (
-                <div style={{ marginTop: 32 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                        <h2 style={{ margin: 0 }}>Training Items in {selectedFolderName}</h2>
-                        <button onClick={closeFolder}>Close Folder</button>
+                        <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
+                            <div className="mb-6">
+                                <h2 className="text-2xl font-semibold text-white">Assignments</h2>
+                                <p className="mt-1 text-sm text-slate-400">
+                                    Assign one or more staff categories to each employee.
+                                </p>
+                            </div>
+
+                            <form onSubmit={createAssignment} className="grid gap-4 md:grid-cols-2">
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-slate-200">
+                                        Employee
+                                    </label>
+                                    <select
+                                        value={assignmentUserId}
+                                        onChange={(e) => setAssignmentUserId(e.target.value)}
+                                        className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition focus:border-sky-400"
+                                    >
+                                        <option value="">Select employee</option>
+                                        {employees.map((employee) => (
+                                            <option key={employee.id} value={employee.id}>
+                                                {employee.full_name} ({employee.email})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-slate-200">
+                                        Staff Category
+                                    </label>
+                                    <select
+                                        value={assignmentStaffCategoryId}
+                                        onChange={(e) => setAssignmentStaffCategoryId(e.target.value)}
+                                        className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition focus:border-sky-400"
+                                    >
+                                        <option value="">Select category</option>
+                                        {staffCategories.map((category) => (
+                                            <option key={category.id} value={category.id}>
+                                                {category.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="md:col-span-2">
+                                    <button
+                                        type="submit"
+                                        className="w-full rounded-2xl bg-violet-500 px-5 py-3 font-semibold text-white transition hover:bg-violet-400"
+                                    >
+                                        Assign Category
+                                    </button>
+                                </div>
+                            </form>
+
+                            <div className="mt-6 space-y-3">
+                                {loadingAssignments ? (
+                                    <p className="text-slate-300">Loading assignments...</p>
+                                ) : assignments.length === 0 ? (
+                                    <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 text-slate-400">
+                                        No assignments yet.
+                                    </div>
+                                ) : (
+                                    assignments.map((assignment) => (
+                                        <div
+                                            key={assignment.id}
+                                            className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/80 p-4 sm:flex-row sm:items-center sm:justify-between"
+                                        >
+                                            <div>
+                                                <p className="font-semibold text-white">
+                                                    {assignment.employee_name}
+                                                    <span className="font-normal text-slate-400">
+                            {" "}
+                                                        ({assignment.employee_email})
+                          </span>
+                                                </p>
+                                                <p className="mt-1 text-sm text-slate-300">
+                                                    Assigned to:{" "}
+                                                    <span className="rounded-full bg-sky-500/15 px-2 py-1 text-xs font-medium text-sky-300">
+                            {assignment.staff_category_name}
+                          </span>
+                                                </p>
+                                            </div>
+
+                                            <button
+                                                onClick={() => deleteAssignment(assignment.id)}
+                                                className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </section>
                     </div>
 
-                    <form onSubmit={createTrainingItem} style={{ marginBottom: 24 }}>
-                        <div style={{ marginBottom: 10 }}>
-                            <label>
-                                Type
-                                <br />
-                                <select value={itemType} onChange={(e) => setItemType(e.target.value)}>
-                                    <option value="text">Text</option>
-                                    <option value="link">Link</option>
-                                    <option value="document">Document</option>
-                                    <option value="video">Video</option>
-                                </select>
-                            </label>
-                        </div>
+                    <div className="space-y-8">
+                        <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
+                            <div className="mb-6">
+                                <h2 className="text-2xl font-semibold text-white">Staff Categories</h2>
+                                <p className="mt-1 text-sm text-slate-400">
+                                    Build role-based training structures like Manager or Instructor.
+                                </p>
+                            </div>
 
-                        <div style={{ marginBottom: 10 }}>
-                            <label>
-                                Title
-                                <br />
-                                <input
-                                    value={itemTitle}
-                                    onChange={(e) => setItemTitle(e.target.value)}
-                                    placeholder="Opening Checklist"
-                                />
-                            </label>
-                        </div>
-
-                        {itemType === "link" && (
-                            <div style={{ marginBottom: 10 }}>
-                                <label>
-                                    URL
-                                    <br />
+                            <form onSubmit={createStaffCategory} className="space-y-4">
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-slate-200">
+                                        Category Name
+                                    </label>
                                     <input
-                                        value={itemUrl}
-                                        onChange={(e) => setItemUrl(e.target.value)}
-                                        placeholder="https://..."
+                                        value={staffCategoryName}
+                                        onChange={(e) => setStaffCategoryName(e.target.value)}
+                                        placeholder="e.g. Manager"
+                                        className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-sky-400"
                                     />
-                                </label>
-                            </div>
-                        )}
+                                </div>
 
-                        {itemType === "text" && (
-                            <div style={{ marginBottom: 10 }}>
-                                <label>
-                                    Body
-                                    <br />
-                                    <textarea
-                                        rows={4}
-                                        style={{ width: 320 }}
-                                        value={itemBody}
-                                        onChange={(e) => setItemBody(e.target.value)}
-                                        placeholder="Write the training text here..."
-                                    />
-                                </label>
-                            </div>
-                        )}
-
-                        {(itemType === "document" || itemType === "video") && (
-                            <div style={{ marginBottom: 10 }}>
-                                <label>
-                                    Upload file
-                                    <br />
+                                <div>
+                                    <label className="mb-2 block text-sm font-medium text-slate-200">
+                                        Description
+                                    </label>
                                     <input
-                                        type="file"
-                                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                                        value={staffCategoryDescription}
+                                        onChange={(e) => setStaffCategoryDescription(e.target.value)}
+                                        placeholder="Training for managers"
+                                        className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-sky-400"
                                     />
-                                </label>
-                            </div>
-                        )}
+                                </div>
 
-                        <button type="submit">Add Training Item</button>
-                    </form>
+                                <button
+                                    type="submit"
+                                    className="w-full rounded-2xl bg-sky-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-sky-400"
+                                >
+                                    Create Staff Category
+                                </button>
+                            </form>
 
-                    {loadingTrainingItems ? (
-                        <p>Loading training items...</p>
-                    ) : trainingItems.length === 0 ? (
-                        <p>No training items in this folder yet.</p>
-                    ) : (
-                        <ul>
-                            {trainingItems.map((item) => (
-                                <li key={item.id} style={{ marginBottom: 14 }}>
-                                    {replacingItemId === item.id ? (
-                                        <div>
-                                            <div style={{ marginBottom: 8 }}>
-                                                <input
-                                                    value={replacementTitle}
-                                                    onChange={(e) => setReplacementTitle(e.target.value)}
-                                                    placeholder="Title"
-                                                />
-                                            </div>
+                            <div className="mt-6 grid gap-4 md:grid-cols-2">
+                                {loadingCategories ? (
+                                    <p className="text-slate-300">Loading staff categories...</p>
+                                ) : staffCategories.length === 0 ? (
+                                    <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 text-slate-400">
+                                        No staff categories yet.
+                                    </div>
+                                ) : (
+                                    staffCategories.map((category) => {
+                                        const isOpen = selectedStaffCategoryId === category.id;
 
-                                            <div style={{ marginBottom: 8 }}>
-                                                <input
-                                                    type="file"
-                                                    onChange={(e) => setReplacementFile(e.target.files?.[0] || null)}
-                                                />
-                                            </div>
+                                        return (
+                                            <div
+                                                key={category.id}
+                                                className={`rounded-3xl border p-5 transition ${
+                                                    isOpen
+                                                        ? "border-sky-500/50 bg-sky-500/10 shadow-lg shadow-sky-500/10"
+                                                        : "border-slate-800 bg-slate-950/80"
+                                                }`}
+                                            >
+                                                <div className="mb-3 text-3xl">🧩</div>
+                                                <h3 className="text-xl font-semibold text-white">{category.name}</h3>
+                                                <p className="mt-2 text-sm leading-6 text-slate-400">
+                                                    {category.description || "Role-based category"}
+                                                </p>
 
-                                            <button onClick={() => saveReplaceFile(item)}>Save File</button>
-                                            <button style={{ marginLeft: 8 }} onClick={cancelReplaceFile}>
-                                                Cancel
-                                            </button>
-                                        </div>
-                                    ) : editingItemId === item.id ? (
-                                        <div>
-                                            <div style={{ marginBottom: 8 }}>
-                                                <input
-                                                    value={editItemTitle}
-                                                    onChange={(e) => setEditItemTitle(e.target.value)}
-                                                    placeholder="Title"
-                                                />
-                                            </div>
-
-                                            {editItemType === "link" && (
-                                                <div style={{ marginBottom: 8 }}>
-                                                    <input
-                                                        value={editItemUrl}
-                                                        onChange={(e) => setEditItemUrl(e.target.value)}
-                                                        placeholder="https://..."
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {editItemType === "text" && (
-                                                <div style={{ marginBottom: 8 }}>
-                          <textarea
-                              rows={4}
-                              style={{ width: 320 }}
-                              value={editItemBody}
-                              onChange={(e) => setEditItemBody(e.target.value)}
-                          />
-                                                </div>
-                                            )}
-
-                                            <button onClick={() => saveEditTrainingItem(item)}>Save</button>
-                                            <button style={{ marginLeft: 8 }} onClick={cancelEditTrainingItem}>
-                                                Cancel
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div>
-                                            <strong>{item.type}</strong> — {item.title}
-                                            {item.body ? ` — ${item.body}` : ""}
-                                            {item.url ? (
-                                                <>
-                                                    {" "}
-                                                    —{" "}
-                                                    <a href={item.url} target="_blank" rel="noreferrer">
-                                                        Open Link
-                                                    </a>
-                                                </>
-                                            ) : null}
-                                            {item.file_path ? (
-                                                <>
-                                                    {" "}
-                                                    —{" "}
-                                                    <a
-                                                        href={`${apiBaseUrl}${item.file_path}`}
-                                                        target="_blank"
-                                                        rel="noreferrer"
+                                                <div className="mt-4 flex flex-wrap gap-2">
+                                                    <button
+                                                        onClick={() => loadFolders(category.id, category.name)}
+                                                        className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
                                                     >
-                                                        Open File
-                                                    </a>
-                                                </>
-                                            ) : null}
+                                                        {isOpen ? "Opened" : "Open"}
+                                                    </button>
 
-                                            {(item.type === "text" || item.type === "link") && (
-                                                <button
-                                                    style={{ marginLeft: 12 }}
-                                                    onClick={() => startEditTrainingItem(item)}
-                                                >
-                                                    Edit
-                                                </button>
-                                            )}
+                                                    <button
+                                                        onClick={() => deleteStaffCategory(category.id)}
+                                                        className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20"
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </section>
 
-                                            {(item.type === "document" || item.type === "video") && (
-                                                <button
-                                                    style={{ marginLeft: 12 }}
-                                                    onClick={() => startReplaceFile(item)}
-                                                >
-                                                    Replace File
-                                                </button>
-                                            )}
+                        {selectedStaffCategoryId && (
+                            <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
+                                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
+                                        <p className="text-sm uppercase tracking-wide text-slate-400">
+                                            Open Category
+                                        </p>
+                                        <h2 className="mt-1 text-2xl font-semibold text-white">
+                                            Folders in {selectedStaffCategoryName}
+                                        </h2>
+                                    </div>
 
-                                            <button
-                                                style={{ marginLeft: 8 }}
-                                                onClick={() => deleteTrainingItem(item.id)}
+                                    <button
+                                        onClick={closeStaffCategory}
+                                        className="rounded-2xl border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"
+                                    >
+                                        Close Category
+                                    </button>
+                                </div>
+
+                                <form onSubmit={createFolder} className="space-y-4">
+                                    <div>
+                                        <label className="mb-2 block text-sm font-medium text-slate-200">
+                                            Folder Name
+                                        </label>
+                                        <input
+                                            value={folderName}
+                                            onChange={(e) => setFolderName(e.target.value)}
+                                            placeholder="Leadership"
+                                            className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-sky-400"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-2 block text-sm font-medium text-slate-200">
+                                            Description
+                                        </label>
+                                        <input
+                                            value={folderDescription}
+                                            onChange={(e) => setFolderDescription(e.target.value)}
+                                            placeholder="Leadership training files"
+                                            className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-sky-400"
+                                        />
+                                    </div>
+
+                                    <button
+                                        type="submit"
+                                        className="w-full rounded-2xl bg-amber-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-amber-400"
+                                    >
+                                        Create Folder
+                                    </button>
+                                </form>
+
+                                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                                    {loadingFolders ? (
+                                        <p className="text-slate-300">Loading folders...</p>
+                                    ) : folders.length === 0 ? (
+                                        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 text-slate-400">
+                                            No folders in this category yet.
+                                        </div>
+                                    ) : (
+                                        folders.map((folder) => (
+                                            <div
+                                                key={folder.id}
+                                                className={`rounded-3xl border p-5 transition ${
+                                                    selectedFolderId === folder.id
+                                                        ? "border-amber-500/40 bg-amber-500/10 shadow-lg shadow-amber-500/10"
+                                                        : "border-slate-800 bg-slate-950/80"
+                                                }`}
                                             >
-                                                Delete
-                                            </button>
+                                                {editingFolderId === folder.id ? (
+                                                    <div className="space-y-3">
+                                                        <input
+                                                            value={editFolderName}
+                                                            onChange={(e) => setEditFolderName(e.target.value)}
+                                                            placeholder="Folder name"
+                                                            className="w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none transition focus:border-sky-400"
+                                                        />
+                                                        <input
+                                                            value={editFolderDescription}
+                                                            onChange={(e) => setEditFolderDescription(e.target.value)}
+                                                            placeholder="Description"
+                                                            className="w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none transition focus:border-sky-400"
+                                                        />
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={() => saveEditFolder(folder.id)}
+                                                                className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-slate-950"
+                                                            >
+                                                                Save
+                                                            </button>
+                                                            <button
+                                                                onClick={cancelEditFolder}
+                                                                className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-white"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <div className="mb-3 text-4xl">📁</div>
+                                                        <h3 className="text-xl font-semibold text-white">{folder.name}</h3>
+                                                        <p className="mt-2 text-sm leading-6 text-slate-400">
+                                                            {folder.description || "Training folder"}
+                                                        </p>
+
+                                                        <div className="mt-4 flex flex-wrap gap-2">
+                                                            <button
+                                                                onClick={() => loadTrainingItems(folder.id, folder.name)}
+                                                                className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+                                                            >
+                                                                {selectedFolderId === folder.id ? "Opened" : "Open"}
+                                                            </button>
+
+                                                            <button
+                                                                onClick={() => startEditFolder(folder)}
+                                                                className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-white transition hover:border-slate-500 hover:bg-slate-800"
+                                                            >
+                                                                Edit
+                                                            </button>
+
+                                                            <button
+                                                                onClick={() => deleteFolder(folder.id)}
+                                                                className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20"
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </section>
+                        )}
+
+                        {selectedFolderId && (
+                            <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
+                                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <div>
+                                        <p className="text-sm uppercase tracking-wide text-slate-400">
+                                            Open Folder
+                                        </p>
+                                        <h2 className="mt-1 text-2xl font-semibold text-white">
+                                            Training in {selectedFolderName}
+                                        </h2>
+                                    </div>
+
+                                    <button
+                                        onClick={closeFolder}
+                                        className="rounded-2xl border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"
+                                    >
+                                        Close Folder
+                                    </button>
+                                </div>
+
+                                <form onSubmit={createTrainingItem} className="space-y-4">
+                                    <div>
+                                        <label className="mb-2 block text-sm font-medium text-slate-200">
+                                            Type
+                                        </label>
+                                        <select
+                                            value={itemType}
+                                            onChange={(e) => setItemType(e.target.value)}
+                                            className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition focus:border-sky-400"
+                                        >
+                                            <option value="text">Text</option>
+                                            <option value="link">Link</option>
+                                            <option value="document">Document</option>
+                                            <option value="video">Video</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="mb-2 block text-sm font-medium text-slate-200">
+                                            Title
+                                        </label>
+                                        <input
+                                            value={itemTitle}
+                                            onChange={(e) => setItemTitle(e.target.value)}
+                                            placeholder="Opening Checklist"
+                                            className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-sky-400"
+                                        />
+                                    </div>
+
+                                    {itemType === "link" && (
+                                        <div>
+                                            <label className="mb-2 block text-sm font-medium text-slate-200">
+                                                URL
+                                            </label>
+                                            <input
+                                                value={itemUrl}
+                                                onChange={(e) => setItemUrl(e.target.value)}
+                                                placeholder="https://..."
+                                                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-sky-400"
+                                            />
                                         </div>
                                     )}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
+
+                                    {itemType === "text" && (
+                                        <div>
+                                            <label className="mb-2 block text-sm font-medium text-slate-200">
+                                                Body
+                                            </label>
+                                            <textarea
+                                                rows={4}
+                                                value={itemBody}
+                                                onChange={(e) => setItemBody(e.target.value)}
+                                                placeholder="Write the training text here..."
+                                                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-sky-400"
+                                            />
+                                        </div>
+                                    )}
+
+                                    {(itemType === "document" || itemType === "video") && (
+                                        <div>
+                                            <label className="mb-2 block text-sm font-medium text-slate-200">
+                                                Upload File
+                                            </label>
+                                            <input
+                                                type="file"
+                                                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                                                className="block w-full text-sm text-slate-300 file:mr-4 file:rounded-xl file:border-0 file:bg-slate-800 file:px-4 file:py-2 file:text-white hover:file:bg-slate-700"
+                                            />
+                                        </div>
+                                    )}
+
+                                    <button
+                                        type="submit"
+                                        className="w-full rounded-2xl bg-emerald-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400"
+                                    >
+                                        Add Training Item
+                                    </button>
+                                </form>
+
+                                <div className="mt-6 space-y-4">
+                                    {loadingTrainingItems ? (
+                                        <p className="text-slate-300">Loading training items...</p>
+                                    ) : trainingItems.length === 0 ? (
+                                        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 text-slate-400">
+                                            No training items in this folder yet.
+                                        </div>
+                                    ) : (
+                                        trainingItems.map((item) => (
+                                            <div
+                                                key={item.id}
+                                                className="rounded-3xl border border-slate-800 bg-slate-950/80 p-5"
+                                            >
+                                                {replacingItemId === item.id ? (
+                                                    <div className="space-y-3">
+                                                        <input
+                                                            value={replacementTitle}
+                                                            onChange={(e) => setReplacementTitle(e.target.value)}
+                                                            placeholder="Title"
+                                                            className="w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none transition focus:border-sky-400"
+                                                        />
+                                                        <input
+                                                            type="file"
+                                                            onChange={(e) => setReplacementFile(e.target.files?.[0] || null)}
+                                                            className="block w-full text-sm text-slate-300 file:mr-4 file:rounded-xl file:border-0 file:bg-slate-800 file:px-4 file:py-2 file:text-white hover:file:bg-slate-700"
+                                                        />
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={() => saveReplaceFile(item)}
+                                                                className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-slate-950"
+                                                            >
+                                                                Save File
+                                                            </button>
+                                                            <button
+                                                                onClick={cancelReplaceFile}
+                                                                className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-white"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : editingItemId === item.id ? (
+                                                    <div className="space-y-3">
+                                                        <input
+                                                            value={editItemTitle}
+                                                            onChange={(e) => setEditItemTitle(e.target.value)}
+                                                            placeholder="Title"
+                                                            className="w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none transition focus:border-sky-400"
+                                                        />
+
+                                                        {editItemType === "link" && (
+                                                            <input
+                                                                value={editItemUrl}
+                                                                onChange={(e) => setEditItemUrl(e.target.value)}
+                                                                placeholder="https://..."
+                                                                className="w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none transition focus:border-sky-400"
+                                                            />
+                                                        )}
+
+                                                        {editItemType === "text" && (
+                                                            <textarea
+                                                                rows={4}
+                                                                value={editItemBody}
+                                                                onChange={(e) => setEditItemBody(e.target.value)}
+                                                                className="w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none transition focus:border-sky-400"
+                                                            />
+                                                        )}
+
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                onClick={() => saveEditTrainingItem(item)}
+                                                                className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-slate-950"
+                                                            >
+                                                                Save
+                                                            </button>
+                                                            <button
+                                                                onClick={cancelEditTrainingItem}
+                                                                className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-white"
+                                                            >
+                                                                Cancel
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <div className="mb-4 flex items-start justify-between gap-4">
+                                                            <div className="flex gap-4">
+                                                                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-900 text-2xl">
+                                                                    {getItemIcon(item.type)}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="flex flex-wrap items-center gap-2">
+                                                                        <h3 className="text-xl font-semibold text-white">{item.title}</h3>
+                                                                        <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-medium uppercase tracking-wide text-slate-300">
+                                      {item.type}
+                                    </span>
+                                                                    </div>
+
+                                                                    {item.body && (
+                                                                        <p className="mt-3 text-sm leading-7 text-slate-300">
+                                                                            {item.body}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {item.url && (
+                                                                <a
+                                                                    href={item.url}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-2 text-sm font-medium text-sky-300 transition hover:bg-sky-500/20"
+                                                                >
+                                                                    Open Link
+                                                                </a>
+                                                            )}
+
+                                                            {item.file_path && (
+                                                                <a
+                                                                    href={`${apiBaseUrl}${item.file_path}`}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-2 text-sm font-medium text-violet-300 transition hover:bg-violet-500/20"
+                                                                >
+                                                                    Open File
+                                                                </a>
+                                                            )}
+
+                                                            {(item.type === "text" || item.type === "link") && (
+                                                                <button
+                                                                    onClick={() => startEditTrainingItem(item)}
+                                                                    className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-white transition hover:border-slate-500 hover:bg-slate-800"
+                                                                >
+                                                                    Edit
+                                                                </button>
+                                                            )}
+
+                                                            {(item.type === "document" || item.type === "video") && (
+                                                                <button
+                                                                    onClick={() => startReplaceFile(item)}
+                                                                    className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-white transition hover:border-slate-500 hover:bg-slate-800"
+                                                                >
+                                                                    Replace File
+                                                                </button>
+                                                            )}
+
+                                                            <button
+                                                                onClick={() => deleteTrainingItem(item.id)}
+                                                                className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20"
+                                                            >
+                                                                Delete
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </section>
+                        )}
+                    </div>
                 </div>
-            )}
 
-            <div style={{ marginTop: 32 }}>
-                <h2>Training Completions</h2>
+                <section className="mt-8 rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
+                    <div className="mb-6">
+                        <h2 className="text-2xl font-semibold text-white">Training Completions</h2>
+                        <p className="mt-1 text-sm text-slate-400">
+                            Track which employees completed which training items.
+                        </p>
+                    </div>
 
-                {loadingCompletions ? (
-                    <p>Loading completions...</p>
-                ) : completions.length === 0 ? (
-                    <p>No completions yet.</p>
-                ) : (
-                    <ul>
-                        {completions.map((completion) => (
-                            <li key={completion.id} style={{ marginBottom: 10 }}>
-                                <strong>{completion.employee_name}</strong> ({completion.employee_email}) —{" "}
-                                <strong>{completion.training_item_type}</strong> — {completion.training_item_title} —{" "}
-                                {new Date(completion.completed_at).toLocaleString()}
-                            </li>
-                        ))}
-                    </ul>
-                )}
+                    {loadingCompletions ? (
+                        <p className="text-slate-300">Loading completions...</p>
+                    ) : completions.length === 0 ? (
+                        <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 text-slate-400">
+                            No completions yet.
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {completions.map((completion) => (
+                                <div
+                                    key={completion.id}
+                                    className="flex flex-col gap-3 rounded-2xl border border-slate-800 bg-slate-950/80 p-4 sm:flex-row sm:items-center sm:justify-between"
+                                >
+                                    <div>
+                                        <p className="font-semibold text-white">
+                                            {completion.employee_name}
+                                            <span className="font-normal text-slate-400">
+                        {" "}
+                                                ({completion.employee_email})
+                      </span>
+                                        </p>
+                                        <p className="mt-1 text-sm text-slate-300">
+                                            {completion.training_item_title}
+                                            <span className="ml-2 rounded-full bg-emerald-500/15 px-2 py-1 text-xs font-medium text-emerald-300">
+                        {completion.training_item_type}
+                      </span>
+                                        </p>
+                                    </div>
+
+                                    <span className="text-sm text-slate-400">
+                    {new Date(completion.completed_at).toLocaleString()}
+                  </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </section>
             </div>
         </div>
     );

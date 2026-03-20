@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 type StaffCategory = {
@@ -57,11 +57,19 @@ function EmployeeDashboard() {
     const [loadingCategories, setLoadingCategories] = useState(true);
     const [loadingFolders, setLoadingFolders] = useState(false);
     const [loadingItems, setLoadingItems] = useState(false);
+    const [markingCompleteId, setMarkingCompleteId] = useState<number | null>(null);
 
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL as string;
 
     function getToken() {
         return localStorage.getItem("token");
+    }
+
+    function clearAuthAndRedirect() {
+        localStorage.removeItem("token");
+        localStorage.removeItem("role");
+        localStorage.removeItem("email");
+        navigate("/login");
     }
 
     function closeCategory() {
@@ -91,10 +99,7 @@ function EmployeeDashboard() {
             });
 
             if (res.status === 401 || res.status === 403) {
-                localStorage.removeItem("token");
-                localStorage.removeItem("role");
-                localStorage.removeItem("email");
-                navigate("/login");
+                clearAuthAndRedirect();
                 return;
             }
 
@@ -137,10 +142,7 @@ function EmployeeDashboard() {
             );
 
             if (res.status === 401 || res.status === 403) {
-                localStorage.removeItem("token");
-                localStorage.removeItem("role");
-                localStorage.removeItem("email");
-                navigate("/login");
+                clearAuthAndRedirect();
                 return;
             }
 
@@ -180,10 +182,7 @@ function EmployeeDashboard() {
             );
 
             if (res.status === 401 || res.status === 403) {
-                localStorage.removeItem("token");
-                localStorage.removeItem("role");
-                localStorage.removeItem("email");
-                navigate("/login");
+                clearAuthAndRedirect();
                 return;
             }
 
@@ -214,10 +213,7 @@ function EmployeeDashboard() {
             });
 
             if (res.status === 401 || res.status === 403) {
-                localStorage.removeItem("token");
-                localStorage.removeItem("role");
-                localStorage.removeItem("email");
-                navigate("/login");
+                clearAuthAndRedirect();
                 return;
             }
 
@@ -253,12 +249,11 @@ function EmployeeDashboard() {
     }
 
     async function markComplete(trainingItemId: number) {
-        if (isCompleted(trainingItemId)) {
-            return;
-        }
+        if (isCompleted(trainingItemId)) return;
 
         try {
             setError("");
+            setMarkingCompleteId(trainingItemId);
 
             const token = getToken();
 
@@ -274,10 +269,7 @@ function EmployeeDashboard() {
             });
 
             if (res.status === 401 || res.status === 403) {
-                localStorage.removeItem("token");
-                localStorage.removeItem("role");
-                localStorage.removeItem("email");
-                navigate("/login");
+                clearAuthAndRedirect();
                 return;
             }
 
@@ -292,156 +284,343 @@ function EmployeeDashboard() {
         } catch (err) {
             console.error("Mark complete error:", err);
             setError("Something went wrong while marking item complete");
+        } finally {
+            setMarkingCompleteId(null);
         }
     }
 
+    function getItemIcon(type: string) {
+        switch (type) {
+            case "document":
+                return "📄";
+            case "video":
+                return "🎥";
+            case "link":
+                return "🔗";
+            case "text":
+                return "📝";
+            default:
+                return "📘";
+        }
+    }
+
+    const completedCount = useMemo(() => completions.length, [completions]);
+
     return (
-        <div style={{ padding: 24 }}>
-            <h1>Employee Dashboard</h1>
-            <p>View your assigned training categories, folders, and items.</p>
-
-            {error && <p style={{ color: "crimson" }}>{error}</p>}
-
-            <h2>Assigned Categories</h2>
-
-            {loadingCategories ? (
-                <p>Loading categories...</p>
-            ) : categories.length === 0 ? (
-                <p>No categories assigned yet.</p>
-            ) : (
-                <ul>
-                    {categories.map((category) => (
-                        <li key={category.id} style={{ marginBottom: 12 }}>
-                            <button
-                                style={{ marginRight: 10 }}
-                                onClick={() => loadMyFolders(category.id, category.name)}
-                            >
-                                Open
-                            </button>
-                            <strong>{category.name}</strong>
-                            {category.description ? ` — ${category.description}` : ""}
-                        </li>
-                    ))}
-                </ul>
-            )}
-
-            {selectedCategoryId && (
-                <div style={{ marginTop: 24 }}>
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                            marginBottom: 12,
-                        }}
-                    >
-                        <h2 style={{ margin: 0 }}>Folders in {selectedCategoryName}</h2>
-                        <button onClick={closeCategory}>Close Category</button>
+        <div className="min-h-[calc(100vh-160px)] bg-slate-950 px-6 py-14 text-white md:px-10">
+            <div className="mx-auto max-w-7xl">
+                <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                        <p className="mb-4 inline-block rounded-full border border-sky-500/30 bg-sky-500/10 px-4 py-1 text-sm font-medium text-sky-300">
+                            Employee workspace
+                        </p>
+                        <h1 className="text-4xl font-bold leading-tight md:text-5xl">
+                            Your assigned training, organized clearly.
+                        </h1>
+                        <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300">
+                            Open your assigned categories, browse training folders, review files or notes,
+                            and mark your lessons complete as you go.
+                        </p>
                     </div>
 
-                    {loadingFolders ? (
-                        <p>Loading folders...</p>
-                    ) : folders.length === 0 ? (
-                        <p>No folders in this category yet.</p>
-                    ) : (
-                        <ul>
-                            {folders.map((folder) => (
-                                <li key={folder.id} style={{ marginBottom: 12 }}>
-                                    <button
-                                        style={{ marginRight: 10 }}
-                                        onClick={() => loadMyTrainingItems(folder.id, folder.name)}
-                                    >
-                                        Open
-                                    </button>
-                                    <strong>{folder.name}</strong>
-                                    {folder.description ? ` — ${folder.description}` : ""}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
+                            <p className="text-sm text-slate-400">Assigned Categories</p>
+                            <p className="mt-2 text-3xl font-bold text-white">{categories.length}</p>
+                        </div>
+                        <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
+                            <p className="text-sm text-slate-400">Completed Items</p>
+                            <p className="mt-2 text-3xl font-bold text-emerald-300">{completedCount}</p>
+                        </div>
+                    </div>
                 </div>
-            )}
 
-            {selectedFolderId && (
-                <div style={{ marginTop: 24 }}>
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                            marginBottom: 12,
-                        }}
-                    >
-                        <h2 style={{ margin: 0 }}>Training Items in {selectedFolderName}</h2>
-                        <button onClick={closeFolder}>Close Folder</button>
+                {error && (
+                    <div className="mb-8 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                        {error}
                     </div>
+                )}
 
-                    {loadingItems ? (
-                        <p>Loading training items...</p>
-                    ) : trainingItems.length === 0 ? (
-                        <p>No training items in this folder yet.</p>
-                    ) : (
-                        <ul>
-                            {trainingItems.map((item) => (
-                                <li key={item.id} style={{ marginBottom: 16 }}>
+                <div className="grid gap-8 xl:grid-cols-[1.15fr_1fr]">
+                    <div className="space-y-8">
+                        <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
+                            <div className="mb-6 flex items-center justify-between gap-4">
+                                <div>
+                                    <h2 className="text-2xl font-semibold text-white">Assigned Categories</h2>
+                                    <p className="mt-1 text-sm text-slate-400">
+                                        Open a role category to view its folders.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {loadingCategories ? (
+                                <p className="text-slate-300">Loading categories...</p>
+                            ) : categories.length === 0 ? (
+                                <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 text-slate-400">
+                                    No categories assigned yet.
+                                </div>
+                            ) : (
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    {categories.map((category) => {
+                                        const isOpen = selectedCategoryId === category.id;
+
+                                        return (
+                                            <button
+                                                key={category.id}
+                                                type="button"
+                                                onClick={() => loadMyFolders(category.id, category.name)}
+                                                className={`rounded-3xl border p-5 text-left transition ${
+                                                    isOpen
+                                                        ? "border-sky-500/50 bg-sky-500/10 shadow-lg shadow-sky-500/10"
+                                                        : "border-slate-800 bg-slate-950/80 hover:border-slate-600 hover:bg-slate-950"
+                                                }`}
+                                            >
+                                                <div className="flex items-start justify-between gap-4">
+                                                    <div>
+                                                        <div className="mb-3 text-3xl">🧩</div>
+                                                        <h3 className="text-xl font-semibold text-white">{category.name}</h3>
+                                                        <p className="mt-2 text-sm leading-6 text-slate-400">
+                                                            {category.description || "Role-based training category"}
+                                                        </p>
+                                                    </div>
+
+                                                    <span
+                                                        className={`rounded-full px-3 py-1 text-xs font-medium ${
+                                                            isOpen
+                                                                ? "bg-sky-500/20 text-sky-300"
+                                                                : "bg-slate-800 text-slate-300"
+                                                        }`}
+                                                    >
+                            {isOpen ? "Open" : "View"}
+                          </span>
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </section>
+
+                        {selectedCategoryId && (
+                            <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
+                                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                     <div>
-                                        <strong>{item.type}</strong> — {item.title}
-                                        {isCompleted(item.id) ? (
-                                            <span style={{ marginLeft: 10, color: "green" }}>
-                        Completed
-                      </span>
-                                        ) : null}
+                                        <p className="text-sm uppercase tracking-wide text-slate-400">
+                                            Open Category
+                                        </p>
+                                        <h2 className="mt-1 text-2xl font-semibold text-white">
+                                            {selectedCategoryName}
+                                        </h2>
                                     </div>
 
-                                    {item.body ? <p>{item.body}</p> : null}
+                                    <button
+                                        onClick={closeCategory}
+                                        className="rounded-2xl border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"
+                                    >
+                                        Close Category
+                                    </button>
+                                </div>
 
-                                    {item.url ? (
-                                        <p>
-                                            <a href={item.url} target="_blank" rel="noreferrer">
-                                                Open Link
-                                            </a>
-                                        </p>
-                                    ) : null}
+                                {loadingFolders ? (
+                                    <p className="text-slate-300">Loading folders...</p>
+                                ) : folders.length === 0 ? (
+                                    <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 text-slate-400">
+                                        No folders in this category yet.
+                                    </div>
+                                ) : (
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        {folders.map((folder) => {
+                                            const isOpen = selectedFolderId === folder.id;
 
-                                    {item.file_path ? (
-                                        <p>
-                                            <a
-                                                href={`${apiBaseUrl}${item.file_path}`}
-                                                target="_blank"
-                                                rel="noreferrer"
+                                            return (
+                                                <button
+                                                    key={folder.id}
+                                                    type="button"
+                                                    onClick={() => loadMyTrainingItems(folder.id, folder.name)}
+                                                    className={`rounded-3xl border p-5 text-left transition ${
+                                                        isOpen
+                                                            ? "border-amber-500/40 bg-amber-500/10 shadow-lg shadow-amber-500/10"
+                                                            : "border-slate-800 bg-slate-950/80 hover:border-slate-600 hover:bg-slate-950"
+                                                    }`}
+                                                >
+                                                    <div className="mb-3 text-4xl">📁</div>
+                                                    <div className="flex items-start justify-between gap-4">
+                                                        <div>
+                                                            <h3 className="text-xl font-semibold text-white">{folder.name}</h3>
+                                                            <p className="mt-2 text-sm leading-6 text-slate-400">
+                                                                {folder.description || "Training folder"}
+                                                            </p>
+                                                        </div>
+
+                                                        <span
+                                                            className={`rounded-full px-3 py-1 text-xs font-medium ${
+                                                                isOpen
+                                                                    ? "bg-amber-500/20 text-amber-300"
+                                                                    : "bg-slate-800 text-slate-300"
+                                                            }`}
+                                                        >
+                              {isOpen ? "Opened" : "Open"}
+                            </span>
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </section>
+                        )}
+                    </div>
+
+                    <div className="space-y-8">
+                        <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
+                            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <p className="text-sm uppercase tracking-wide text-slate-400">
+                                        Training Viewer
+                                    </p>
+                                    <h2 className="mt-1 text-2xl font-semibold text-white">
+                                        {selectedFolderId ? selectedFolderName : "Select a folder"}
+                                    </h2>
+                                </div>
+
+                                {selectedFolderId && (
+                                    <button
+                                        onClick={closeFolder}
+                                        className="rounded-2xl border border-slate-700 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-500 hover:bg-slate-800"
+                                    >
+                                        Close Folder
+                                    </button>
+                                )}
+                            </div>
+
+                            {!selectedFolderId ? (
+                                <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/60 p-8 text-center text-slate-400">
+                                    Open a category, then open a folder to view your training items.
+                                </div>
+                            ) : loadingItems ? (
+                                <p className="text-slate-300">Loading training items...</p>
+                            ) : trainingItems.length === 0 ? (
+                                <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 text-slate-400">
+                                    No training items in this folder yet.
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {trainingItems.map((item) => {
+                                        const completed = isCompleted(item.id);
+
+                                        return (
+                                            <div
+                                                key={item.id}
+                                                className="rounded-3xl border border-slate-800 bg-slate-950/80 p-5"
                                             >
-                                                Open File
-                                            </a>
-                                        </p>
-                                    ) : null}
+                                                <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                                    <div className="flex gap-4">
+                                                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-900 text-2xl">
+                                                            {getItemIcon(item.type)}
+                                                        </div>
 
-                                    {!isCompleted(item.id) && (
-                                        <button onClick={() => markComplete(item.id)}>
-                                            Mark Complete
-                                        </button>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
+                                                        <div>
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <h3 className="text-xl font-semibold text-white">{item.title}</h3>
+                                                                <span className="rounded-full bg-slate-800 px-3 py-1 text-xs font-medium uppercase tracking-wide text-slate-300">
+                                  {item.type}
+                                </span>
+                                                                {completed && (
+                                                                    <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-300">
+                                    Completed
+                                  </span>
+                                                                )}
+                                                            </div>
+
+                                                            {item.body && (
+                                                                <p className="mt-3 text-sm leading-7 text-slate-300">
+                                                                    {item.body}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-wrap items-center gap-3">
+                                                    {item.url && (
+                                                        <a
+                                                            href={item.url}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="rounded-2xl border border-sky-500/30 bg-sky-500/10 px-4 py-2 text-sm font-medium text-sky-300 transition hover:bg-sky-500/20"
+                                                        >
+                                                            Open Link
+                                                        </a>
+                                                    )}
+
+                                                    {item.file_path && (
+                                                        <a
+                                                            href={`${apiBaseUrl}${item.file_path}`}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="rounded-2xl border border-violet-500/30 bg-violet-500/10 px-4 py-2 text-sm font-medium text-violet-300 transition hover:bg-violet-500/20"
+                                                        >
+                                                            Open File
+                                                        </a>
+                                                    )}
+
+                                                    {!completed && (
+                                                        <button
+                                                            onClick={() => markComplete(item.id)}
+                                                            disabled={markingCompleteId === item.id}
+                                                            className="rounded-2xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                                                        >
+                                                            {markingCompleteId === item.id
+                                                                ? "Marking..."
+                                                                : "Mark Complete"}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </section>
+
+                        <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
+                            <div className="mb-5">
+                                <h2 className="text-2xl font-semibold text-white">My Completed Items</h2>
+                                <p className="mt-1 text-sm text-slate-400">
+                                    A quick history of finished training items.
+                                </p>
+                            </div>
+
+                            {completions.length === 0 ? (
+                                <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-5 text-slate-400">
+                                    No completed items yet.
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {completions.map((completion) => (
+                                        <div
+                                            key={completion.id}
+                                            className="flex items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-950/80 p-4"
+                                        >
+                                            <div>
+                                                <p className="font-medium text-white">
+                                                    {completion.training_item_title}
+                                                </p>
+                                                <p className="mt-1 text-sm text-slate-400">
+                                                    {completion.training_item_type}
+                                                </p>
+                                            </div>
+
+                                            <span className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-300">
+                        Completed
+                      </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </section>
+                    </div>
                 </div>
-            )}
-
-            <div style={{ marginTop: 32 }}>
-                <h2>My Completed Items</h2>
-
-                {completions.length === 0 ? (
-                    <p>No completed items yet.</p>
-                ) : (
-                    <ul>
-                        {completions.map((completion) => (
-                            <li key={completion.id} style={{ marginBottom: 8 }}>
-                                <strong>{completion.training_item_type}</strong> —{" "}
-                                {completion.training_item_title}
-                            </li>
-                        ))}
-                    </ul>
-                )}
             </div>
         </div>
     );

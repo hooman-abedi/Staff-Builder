@@ -8,7 +8,11 @@ const pool = require("../db");
 // Body: { businessName, email, password }
 router.post("/auth/register-employer", async (req, res) => {
     try {
-        const { businessName, email, password } = req.body;
+        const { businessName, full_name, email, password } = req.body;
+
+        if (!full_name || !full_name.trim()) {
+            return res.status(400).json({ message: "full_name is required" });
+        }
 
         if (!businessName || !businessName.trim()) {
             return res.status(400).json({ message: "businessName is required" });
@@ -33,10 +37,10 @@ router.post("/auth/register-employer", async (req, res) => {
         const passwordHash = await bcrypt.hash(password, 10);
 
         const userResult = await pool.query(
-            `INSERT INTO users (business_id, email, password_hash, role)
-       VALUES ($1, $2, $3, 'employer')
-       RETURNING id, business_id, email, role, created_at`,
-            [business.id, email.trim().toLowerCase(), passwordHash]
+            `INSERT INTO users (business_id, full_name, email, password_hash, role)
+   VALUES ($1, $2, $3, $4, 'employer')
+   RETURNING id, business_id, full_name, email, role, created_at`,
+            [business.id, full_name.trim(), email.trim().toLowerCase(), passwordHash]
         );
         const createdUser = userResult.rows[0];
 
@@ -56,6 +60,7 @@ router.post("/auth/register-employer", async (req, res) => {
             user: {
                 id: createdUser.id,
                 business_id: createdUser.business_id,
+                full_name: createdUser.full_name,
                 email: createdUser.email,
                 role: createdUser.role,
             },
