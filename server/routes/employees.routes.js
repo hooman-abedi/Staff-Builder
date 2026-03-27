@@ -5,6 +5,83 @@ const { requireAuth, requireRole } = require("../middleware/auth");
 const pool = require("../db");
 const crypto = require("crypto");
 
+
+async function checkBusinessCanAddEmployee(businessId, role) {
+    if (role === "super_admin" || role === "support_admin") {
+        return {
+            allowed: true,
+            business: null,
+            employeeCount: 0,
+        };
+    }
+    const businessResult = await pool.query(
+        `
+        SELECT id, subscription_plan, subscription_status, trial_ends_at, max_employees
+        FROM businesses
+        WHERE id = $1
+        `,
+        [businessId]
+    );
+
+    if (businessResult.rowCount === 0) {
+        return {
+            allowed: false,
+            status: 404,
+            message: "Business not found",
+        };
+    }
+
+    const business = businessResult.rows[0];
+
+    if (
+        business.subscription_status === "trial_active" &&
+        business.trial_ends_at &&
+        new Date(business.trial_ends_at) < new Date()
+    ) {
+        return {
+            allowed: false,
+            status: 403,
+            message: "Your free trial has expired. Please subscribe to continue adding employees.",
+        };
+    }
+
+    if (
+        business.subscription_status !== "trial_active" &&
+        business.subscription_status !== "active"
+    ) {
+        return {
+            allowed: false,
+            status: 403,
+            message: "Your subscription is not active.",
+        };
+    }
+
+    const employeeCountResult = await pool.query(
+        `
+        SELECT COUNT(*)::int AS employee_count
+        FROM users
+        WHERE business_id = $1
+          AND role = 'employee'
+        `,
+        [businessId]
+    );
+
+    const employeeCount = employeeCountResult.rows[0].employee_count;
+
+    if (employeeCount >= business.max_employees) {
+        return {
+            allowed: false,
+            status: 403,
+            message: `Employee limit reached for your current plan. Maximum allowed: ${business.max_employees}.`,
+        };
+    }
+
+    return {
+        allowed: true,
+        business,
+        employeeCount,
+    };
+}
 // GET all employees in this employer's business
 router.get("/employees", requireAuth, requireRole("employer"), async (req, res) => {
     try {
@@ -22,7 +99,31 @@ router.get("/employees", requireAuth, requireRole("employer"), async (req, res) 
         res.status(500).json({ message: "Internal Server Error" });
     }
 });
+router.get("/employee/all-training-items", requireAuth, async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const businessId = req.user.businessId;
 
+        const result = await pool.query(
+            `
+            SELECT DISTINCT ti.*
+            FROM assignments a
+            JOIN folders f ON f.staff_category_id = a.staff_category_id
+            JOIN training_items ti ON ti.folder_id = f.id
+            WHERE a.user_id = $1
+              AND a.business_id = $2
+              AND ti.business_id = $2
+            ORDER BY ti.created_at DESC
+            `,
+            [userId, businessId]
+        );
+
+        res.json(result.rows);
+    } catch (err) {
+        console.error("Get all employee training items error:", err);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+});
 // POST create a new employee
 router.post("/employees", requireAuth, requireRole("employer"), async (req, res) => {
     try {
@@ -45,6 +146,12 @@ router.post("/employees", requireAuth, requireRole("employer"), async (req, res)
 
         if (!password || typeof password !== "string" || password.length < 6) {
             return res.status(400).json({ message: "password must be at least 6 characters" });
+        }
+
+
+        const accessCheck = await checkBusinessCanAddEmployee(req.user.businessId, req.user.role);
+        if (!accessCheck.allowed) {
+            return res.status(accessCheck.status).json({ message: accessCheck.message });
         }
 
         const passwordHash = await bcrypt.hash(password, 10);
@@ -112,6 +219,11 @@ router.post("/employees/invite", requireAuth, requireRole("employer"), async (re
 
         if (!emailRegex.test(normalizedEmail)) {
             return res.status(400).json({ message: "A valid email is required" });
+        }
+        const accessCheck = await checkBusinessCanAddEmployee(req.user.businessId, req.user.role);
+
+        if (!accessCheck.allowed) {
+            return res.status(accessCheck.status).json({ message: accessCheck.message });
         }
 
         // Create employee with no usable password yet

@@ -58,12 +58,32 @@ function Navbar() {
                         )}
 
                         {isLoggedIn && role === "employer" && (
-                            <Link
-                                to="/employer"
-                                className="text-sm font-medium text-slate-300 transition hover:text-white"
-                            >
-                                Employer Dashboard
-                            </Link>
+                            <>
+                                <Link
+                                    to="/employer"
+                                    className="text-sm font-medium text-slate-300 transition hover:text-white"
+                                >
+                                    Dashboard
+                                </Link>
+                                <Link
+                                    to="/employer/employees"
+                                    className="text-sm font-medium text-slate-300 transition hover:text-white"
+                                >
+                                    Employees
+                                </Link>
+                                <Link
+                                    to="/employer/training"
+                                    className="text-sm font-medium text-slate-300 transition hover:text-white"
+                                >
+                                    Training
+                                </Link>
+                                <Link
+                                    to="/employer/progress"
+                                    className="text-sm font-medium text-slate-300 transition hover:text-white"
+                                >
+                                    Progress
+                                </Link>
+                            </>
                         )}
 
                         {isLoggedIn && role === "employee" && (

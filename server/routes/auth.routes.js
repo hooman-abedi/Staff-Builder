@@ -55,6 +55,7 @@ router.post("/auth/register-employer", async (req, res) => {
             { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
         );
 
+
         res.status(201).json({
             token,
             user: {
@@ -93,15 +94,22 @@ router.post("/auth/login", async (req, res) => {
         if (!password) {
             return res.status(400).json({ message: "password is required" });
         }
-        if (!role || !["employer", "employee"].includes(role)) {
-            return res.status(400).json({ message: "role must be employer or employee" });
+        if (
+            role !== "employer" &&
+            role !== "employee" &&
+            role !== "super_admin" &&
+            role !== "support_admin"
+        ) {
+            return res.status(400).json({
+                message: "role must be employer, employee, super_admin, or support_admin",
+            });
         }
 
         const result = await pool.query(
             `SELECT id, business_id, email, password_hash, role
-       FROM users
-       WHERE email = $1`,
-            [email.trim().toLowerCase()]
+     FROM users
+     WHERE email = $1 AND role = $2`,
+            [email.trim().toLowerCase(), role]
         );
 
         if (result.rowCount === 0) {

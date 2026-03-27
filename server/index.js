@@ -12,6 +12,9 @@ const assignmentsRoutes = require("./routes/assignments.routes");
 const foldersRoutes = require("./routes/folders.routes");
 const employeeViewRoutes = require("./routes/employeeView.routes");
 const completionsRoutes = require("./routes/completions.routes");
+const quizRoutes = require("./routes/quizzes.routes");
+const businessRoutes = require("./routes/business.routes");
+const adminRoutes = require("./routes/admin.routes");
 
 pool.query("SELECT NOW()")
     .then(result => {
@@ -52,6 +55,9 @@ app.use("/api", assignmentsRoutes);
 app.use("/api", foldersRoutes);
 app.use("/api", employeeViewRoutes);
 app.use("/api", completionsRoutes);
+app.use("/api", quizRoutes);
+app.use("/api", businessRoutes);
+app.use("/api", adminRoutes);
 
 const PORT = 5050;
 

@@ -1,0 +1,20 @@
+ALTER TABLE businesses
+ADD COLUMN IF NOT EXISTS subscription_plan TEXT NOT NULL DEFAULT 'trial';
+
+ALTER TABLE businesses
+ADD COLUMN IF NOT EXISTS subscription_status TEXT NOT NULL DEFAULT 'trial_active';
+
+ALTER TABLE businesses
+ADD COLUMN IF NOT EXISTS trial_started_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+ALTER TABLE businesses
+ADD COLUMN IF NOT EXISTS trial_ends_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '7 days');
+
+ALTER TABLE businesses
+ADD COLUMN IF NOT EXISTS max_employees INT NOT NULL DEFAULT 5;
+
+ALTER TABLE businesses
+ADD COLUMN IF NOT EXISTS subscription_started_at TIMESTAMPTZ;
+
+ALTER TABLE businesses
+ADD COLUMN IF NOT EXISTS subscription_ends_at TIMESTAMPTZ;

@@ -65,8 +65,14 @@ function LoginPage() {
 
             if (data.user.role === "employer") {
                 navigate("/employer");
-            } else {
+            } else if (data.user.role === "employee") {
                 navigate("/employee");
+            } else if (data.user.role === "super_admin") {
+                navigate("/admin");
+            } else if (data.user.role === "support_admin") {
+                navigate("/admin");
+            } else {
+                setError("Unknown account role.");
             }
         } catch (err) {
             console.error("Login error:", err);
@@ -99,6 +105,7 @@ function LoginPage() {
                             <ul className="mt-3 space-y-2 text-sm text-slate-300">
                                 <li>• Employer: manage staff, folders, files, and progress</li>
                                 <li>• Employee: view assigned training and complete lessons</li>
+                                <li>• Super Admin: internal platform access and testing</li>
                             </ul>
                         </div>
 
@@ -131,6 +138,7 @@ function LoginPage() {
                             >
                                 <option value="employer">Employer</option>
                                 <option value="employee">Employee</option>
+                                <option value="super_admin">Super Admin</option>
                             </select>
                         </div>
 

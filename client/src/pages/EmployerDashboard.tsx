@@ -142,7 +142,7 @@ function EmployerDashboard() {
     }
 
     async function handleJsonResponse(res: Response) {
-        if (res.status === 401 || res.status === 403) {
+        if (res.status === 401) {
             clearAuthAndRedirect();
             return null;
         }

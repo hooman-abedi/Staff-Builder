@@ -2,7 +2,7 @@ import { Navigate } from "react-router-dom";
 
 type ProtectedRouteProps = {
     children: React.ReactNode;
-    allowedRole: "employer" | "employee";
+    allowedRole: "employer" | "employee" | "super_admin" | "support_admin";
 };
 
 function ProtectedRoute({ children, allowedRole }: ProtectedRouteProps) {
