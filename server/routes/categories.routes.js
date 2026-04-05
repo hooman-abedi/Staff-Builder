@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { requireAuth, requireRole } = require("../middleware/auth");
 const pool = require("../db");
+const { requireActiveSubscription } = require("../middleware/subscription");
 
 router.get("/categories", requireAuth, requireRole("employer"), async (req, res) => {
     try {
@@ -20,7 +21,7 @@ router.get("/categories", requireAuth, requireRole("employer"), async (req, res)
     }
 });
 
-router.post("/categories", requireAuth, requireRole("employer"), async (req, res) => {
+router.post("/categories", requireAuth, requireRole("employer"), requireActiveSubscription, async (req, res) => {
     try {
         const { name, description } = req.body;
 
@@ -42,7 +43,7 @@ router.post("/categories", requireAuth, requireRole("employer"), async (req, res
     }
 });
 
-router.delete("/categories/:id", requireAuth, requireRole("employer"), async (req, res) => {
+router.delete("/categories/:id", requireAuth, requireRole("employer"), requireActiveSubscription,async (req, res) => {
     try {
         const id = Number(req.params.id);
 
@@ -68,7 +69,7 @@ router.delete("/categories/:id", requireAuth, requireRole("employer"), async (re
     }
 });
 
-router.put("/categories/:id", requireAuth, requireRole("employer"), async (req, res) => {
+router.put("/categories/:id", requireAuth, requireRole("employer"), requireActiveSubscription,async (req, res) => {
     try {
         const id = Number(req.params.id);
         const { name, description } = req.body;

@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { requireAuth, requireRole } = require("../middleware/auth");
 const pool = require("../db");
+const { requireActiveSubscription } = require("../middleware/subscription");
 
 // GET all staff categories for this employer's business
 router.get("/staff-categories", requireAuth, requireRole("employer"), async (req, res) => {
@@ -22,7 +23,7 @@ router.get("/staff-categories", requireAuth, requireRole("employer"), async (req
 });
 
 // POST create a new staff category
-router.post("/staff-categories", requireAuth, requireRole("employer"), async (req, res) => {
+router.post("/staff-categories", requireAuth, requireRole("employer"), requireActiveSubscription, async (req, res) => {
     try {
         const { name, description } = req.body;
 
@@ -50,7 +51,7 @@ router.post("/staff-categories", requireAuth, requireRole("employer"), async (re
 });
 
 // PUT update a staff category
-router.put("/staff-categories/:id", requireAuth, requireRole("employer"), async (req, res) => {
+router.put("/staff-categories/:id", requireAuth, requireRole("employer"), requireActiveSubscription,async (req, res) => {
     try {
         const id = Number(req.params.id);
         const { name, description } = req.body;
@@ -88,7 +89,7 @@ router.put("/staff-categories/:id", requireAuth, requireRole("employer"), async 
 });
 
 // DELETE a staff category
-router.delete("/staff-categories/:id", requireAuth, requireRole("employer"), async (req, res) => {
+router.delete("/staff-categories/:id", requireAuth, requireRole("employer"), requireActiveSubscription,async (req, res) => {
     try {
         const id = Number(req.params.id);
 

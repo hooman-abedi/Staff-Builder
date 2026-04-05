@@ -99,7 +99,7 @@ function RegisterPage() {
             setSuccessMessage("Employer account created successfully.");
 
             setTimeout(() => {
-                navigate("/employer");
+                navigate("/employer/training");
             }, 800);
         } catch (err) {
             console.error("Register employer error:", err);

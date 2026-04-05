@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { requireAuth, requireRole } = require("../middleware/auth");
 const pool = require("../db");
+const { requireActiveSubscription } = require("../middleware/subscription");
 
 // GET folders for one staff category
 router.get("/folders", requireAuth, requireRole("employer"), async (req, res) => {
@@ -34,7 +35,7 @@ router.get("/folders", requireAuth, requireRole("employer"), async (req, res) =>
 });
 
 // POST create folder inside a staff category
-router.post("/folders", requireAuth, requireRole("employer"), async (req, res) => {
+router.post("/folders", requireAuth, requireRole("employer"),requireActiveSubscription, async (req, res) => {
     try {
         const { staff_category_id, name, description } = req.body;
 
@@ -80,7 +81,7 @@ router.post("/folders", requireAuth, requireRole("employer"), async (req, res) =
 });
 
 // PUT update folder
-router.put("/folders/:id", requireAuth, requireRole("employer"), async (req, res) => {
+router.put("/folders/:id", requireAuth, requireRole("employer"), requireActiveSubscription,async (req, res) => {
     try {
         const id = Number(req.params.id);
         const { name, description } = req.body;
@@ -118,7 +119,7 @@ router.put("/folders/:id", requireAuth, requireRole("employer"), async (req, res
 });
 
 // DELETE folder
-router.delete("/folders/:id", requireAuth, requireRole("employer"), async (req, res) => {
+router.delete("/folders/:id", requireAuth, requireRole("employer"), requireActiveSubscription,async (req, res) => {
     try {
         const id = Number(req.params.id);
 

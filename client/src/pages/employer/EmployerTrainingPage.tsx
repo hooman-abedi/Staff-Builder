@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import type { BusinessSubscription } from "../../lib/getSubscriptionStatus";
+
 type StaffCategory = {
     id: number;
     business_id: number;
@@ -19,6 +21,13 @@ function EmployerTrainingPage() {
     const [staffCategoryName, setStaffCategoryName] = useState("");
     const [staffCategoryDescription, setStaffCategoryDescription] = useState("");
 
+    const [subscription, setSubscription] = useState<BusinessSubscription | null>(null);
+
+    const [loadingSubscription, setLoadingSubscription] = useState(true);
+
+    const token = localStorage.getItem("token");
+    const isExpired = subscription?.effective_status === "expired";
+
     function clearAuthAndRedirect() {
         localStorage.removeItem("token");
         localStorage.removeItem("role");
@@ -27,7 +36,6 @@ function EmployerTrainingPage() {
     }
 
     function authHeaders(isJson = false) {
-        const token = localStorage.getItem("token");
         return {
             ...(isJson ? { "Content-Type": "application/json" } : {}),
             Authorization: `Bearer ${token}`,
@@ -67,9 +75,55 @@ function EmployerTrainingPage() {
             setLoadingCategories(false);
         }
     }
+    async function loadSubscription() {
+        try {
+            setLoadingSubscription(true);
 
+            const res = await fetch(`${apiBaseUrl}/api/business/subscription-status`, {
+                headers: authHeaders(),
+            });
+
+            const data = await handleJsonResponse(res);
+            if (!data) return;
+
+            if (!res.ok) {
+                setError(data.message || "Failed to load subscription");
+                return;
+            }
+
+            setSubscription(data);
+        } catch (err) {
+            console.error("Load subscription error:", err);
+            setError("Something went wrong while loading subscription");
+        } finally {
+            setLoadingSubscription(false);
+        }
+    }
+    async function upgradePlan(plan: string) {
+        try {
+            setError("");
+
+            const res = await fetch(`${apiBaseUrl}/api/business/subscription`, {
+                method: "PUT",
+                headers: authHeaders(true),
+                body: JSON.stringify({ plan }),
+            });
+
+            const data = await handleJsonResponse(res);
+            if (!data) return;
+
+            if (!res.ok) {
+                setError(data.message || "Failed to upgrade plan");
+                return;
+            }
+
+            await loadSubscription();
+        } catch (err) {
+            console.error("Upgrade error:", err);
+            setError("Something went wrong while upgrading");
+        }
+    }
     useEffect(() => {
-        const token = localStorage.getItem("token");
         const role = localStorage.getItem("role");
 
         if (!token || role !== "employer") {
@@ -77,12 +131,19 @@ function EmployerTrainingPage() {
             return;
         }
 
+
         loadStaffCategories();
+        loadSubscription();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     async function createStaffCategory(e: React.FormEvent) {
         e.preventDefault();
+
+        if (isExpired) {
+            setError("Your subscription has expired. Renew your plan to create staff categories.");
+            return;
+        }
 
         if (!staffCategoryName.trim()) {
             setError("Staff category name is required");
@@ -119,6 +180,11 @@ function EmployerTrainingPage() {
     }
 
     async function deleteStaffCategory(id: number) {
+        if (isExpired) {
+            setError("Your subscription has expired. Renew your plan to delete staff categories.");
+            return;
+        }
+
         const confirmed = window.confirm("Delete this staff category?");
         if (!confirmed) return;
 
@@ -174,21 +240,86 @@ function EmployerTrainingPage() {
                         </div>
                     </div>
                 </div>
+                <div className="mb-8 rounded-3xl border border-slate-800 bg-slate-900/70 p-6">
+                    <h2 className="text-xl font-semibold text-white mb-4">
+                        Subscription
+                    </h2>
+
+                    {loadingSubscription ? (
+                        <p className="text-slate-400">Loading subscription...</p>
+                    ) : (
+                        <>
+                            <p className="text-slate-300 mb-2">
+                                Plan:{" "}
+                                <span className="font-semibold text-white">
+                    {subscription?.subscription_plan || "free"}
+                </span>
+                            </p>
+
+                            <p className="text-slate-300 mb-4">
+                                Status:{" "}
+                                <span
+                                    className={
+                                        subscription?.effective_status === "active"                                            ? "text-emerald-400"
+                                            : "text-red-400"
+                                    }
+                                >
+                    {subscription?.effective_status || "inactive"}
+                </span>
+                            </p>
+
+                            <div className="flex flex-wrap gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => upgradePlan("basic")}
+                                    className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950"
+                                >
+                                    Basic
+                                </button>
+
+                                <button
+                                    onClick={() => upgradePlan("growth")}
+                                    className="rounded-xl bg-violet-500 px-4 py-2 text-sm font-semibold text-white"
+                                >
+                                    Growth
+                                </button>
+
+                                <button
+                                    onClick={() => upgradePlan("enterprise")}
+                                    className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950"
+                                >
+                                    Enterprise
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </div>
 
                 {error && (
-                    <div className="mb-8 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                    <div
+                        className="mb-8 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
                         {error}
                     </div>
                 )}
 
+
                 <div className="grid gap-8 xl:grid-cols-[0.95fr_1.1fr]">
-                    <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
+                    <section
+                        className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
                         <div className="mb-6">
                             <h2 className="text-2xl font-semibold text-white">Create Staff Category</h2>
                             <p className="mt-1 text-sm text-slate-400">
                                 Categories group training by role, such as Manager or Instructor.
                             </p>
                         </div>
+
+                        {isExpired && (
+                            <div
+                                className="mb-6 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                                Your subscription has expired. Creating or deleting training categories is disabled
+                                until you renew your plan.
+                            </div>
+                        )}
 
                         <form onSubmit={createStaffCategory} className="space-y-4">
                             <div>
@@ -217,14 +348,16 @@ function EmployerTrainingPage() {
 
                             <button
                                 type="submit"
-                                className="w-full rounded-2xl bg-sky-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-sky-400"
+                                disabled={isExpired}
+                                className="w-full rounded-2xl bg-sky-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-70 disabled:text-slate-300"
                             >
                                 Create Staff Category
                             </button>
                         </form>
                     </section>
 
-                    <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
+                    <section
+                        className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
                         <div className="mb-6">
                             <h2 className="text-2xl font-semibold text-white">Categories</h2>
                             <p className="mt-1 text-sm text-slate-400">
@@ -263,7 +396,8 @@ function EmployerTrainingPage() {
 
                                             <button
                                                 onClick={() => deleteStaffCategory(category.id)}
-                                                className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20"
+                                                disabled={isExpired}
+                                                className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-70"
                                             >
                                                 Delete
                                             </button>

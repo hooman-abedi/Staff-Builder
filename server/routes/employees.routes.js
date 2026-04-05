@@ -4,6 +4,7 @@ const bcrypt = require("bcrypt");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const pool = require("../db");
 const crypto = require("crypto");
+const { requireActiveSubscription } = require("../middleware/subscription");
 
 
 async function checkBusinessCanAddEmployee(businessId, role) {
@@ -125,7 +126,7 @@ router.get("/employee/all-training-items", requireAuth, async (req, res) => {
     }
 });
 // POST create a new employee
-router.post("/employees", requireAuth, requireRole("employer"), async (req, res) => {
+router.post("/employees", requireAuth, requireRole("employer"), requireActiveSubscription, async (req, res) => {
     try {
         const { full_name, email, password } = req.body;
 
@@ -176,7 +177,7 @@ router.post("/employees", requireAuth, requireRole("employer"), async (req, res)
 });
 
 // DELETE employee
-router.delete("/employees/:id", requireAuth, requireRole("employer"), async (req, res) => {
+router.delete("/employees/:id", requireAuth, requireRole("employer"), requireActiveSubscription,async (req, res) => {
     try {
         const id = Number(req.params.id);
 
@@ -202,7 +203,7 @@ router.delete("/employees/:id", requireAuth, requireRole("employer"), async (req
     }
 });
 // POST invite a new employee
-router.post("/employees/invite", requireAuth, requireRole("employer"), async (req, res) => {
+router.post("/employees/invite", requireAuth, requireRole("employer"), requireActiveSubscription, async (req, res) => {
     try {
         const { full_name, email } = req.body;
 

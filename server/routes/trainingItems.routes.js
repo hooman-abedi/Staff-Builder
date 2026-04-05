@@ -5,6 +5,7 @@ const path = require("path");
 const upload = require("../middleware/upload");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const pool = require("../db");
+const { requireActiveSubscription } = require("../middleware/subscription");
 
 // GET training items for one folder
 router.get("/training-items", requireAuth, requireRole("employer"), async (req, res) => {
@@ -37,7 +38,7 @@ router.get("/training-items", requireAuth, requireRole("employer"), async (req, 
 });
 
 // POST create text/link training item
-router.post("/training-items", requireAuth, requireRole("employer"), async (req, res) => {
+router.post("/training-items", requireAuth, requireRole("employer"), requireActiveSubscription, async (req, res) => {
     try {
         const { folder_id, type, title, url, body } = req.body;
 
@@ -92,7 +93,7 @@ router.post("/training-items", requireAuth, requireRole("employer"), async (req,
 router.post(
     "/training-items/upload",
     requireAuth,
-    requireRole("employer"),
+    requireRole("employer"), requireActiveSubscription,
     upload.single("file"),
     async (req, res) => {
         try {
@@ -153,7 +154,7 @@ router.post(
 );
 
 // PUT update text/link training item
-router.put("/training-items/:id", requireAuth, requireRole("employer"), async (req, res) => {
+router.put("/training-items/:id", requireAuth, requireRole("employer"), requireActiveSubscription,async (req, res) => {
     try {
         const id = Number(req.params.id);
 
@@ -214,7 +215,7 @@ router.put("/training-items/:id", requireAuth, requireRole("employer"), async (r
 router.put(
     "/training-items/:id/upload",
     requireAuth,
-    requireRole("employer"),
+    requireRole("employer"),requireActiveSubscription,
     upload.single("file"),
     async (req, res) => {
         try {
@@ -276,7 +277,7 @@ router.put(
 );
 
 // DELETE training item
-router.delete("/training-items/:id", requireAuth, requireRole("employer"), async (req, res) => {
+router.delete("/training-items/:id", requireAuth, requireRole("employer"), requireActiveSubscription,async (req, res) => {
     try {
         const id = Number(req.params.id);
 

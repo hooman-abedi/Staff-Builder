@@ -113,9 +113,21 @@ function EmployeeDashboard() {
                 return false;
             }
 
-            const subscription = await getSubscriptionStatus(apiBaseUrl, token);
+            const result = await getSubscriptionStatus(apiBaseUrl, token);
 
-            if (subscription.effective_status !== "trial_active" && subscription.effective_status !== "active") {
+            if (!result.ok) {
+                if (result.status === 401) {
+                    clearAuthAndRedirect();
+                    return false;
+                }
+
+                setSubscriptionBlockedMessage(result.message);
+                return false;
+            }
+
+            const effectiveStatus = result.data.effective_status;
+
+            if (effectiveStatus !== "trial_active" && effectiveStatus !== "active") {
                 setSubscriptionBlockedMessage(
                     "Your company subscription is inactive. Please contact your employer."
                 );
@@ -133,7 +145,6 @@ function EmployeeDashboard() {
             setCheckingSubscription(false);
         }
     }
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {

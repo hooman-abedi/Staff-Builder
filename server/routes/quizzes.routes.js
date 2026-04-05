@@ -2,9 +2,10 @@ const express = require("express");
 const router = express.Router();
 const { requireAuth, requireRole } = require("../middleware/auth");
 const pool = require("../db");
+const { requireActiveSubscription } = require("../middleware/subscription");
 
 // POST create quiz for a folder
-router.post("/quizzes", requireAuth, requireRole("employer"), async (req, res) => {
+router.post("/quizzes", requireAuth, requireRole("employer"), requireActiveSubscription, async (req, res) => {
     try {
         const { folder_id, title, passing_score } = req.body;
 
@@ -144,7 +145,7 @@ router.get("/quizzes/:id", requireAuth, async (req, res) => {
 });
 
 // POST add question to quiz
-router.post("/quizzes/:id/questions", requireAuth, requireRole("employer"), async (req, res) => {
+router.post("/quizzes/:id/questions", requireAuth, requireRole("employer"), requireActiveSubscription, async (req, res) => {
     try {
         const quizId = Number(req.params.id);
         const { question_text, question_type, question_order } = req.body;
@@ -195,7 +196,7 @@ router.post("/quizzes/:id/questions", requireAuth, requireRole("employer"), asyn
 });
 
 // POST add choice to a multiple-choice question
-router.post("/quiz-questions/:id/choices", requireAuth, requireRole("employer"), async (req, res) => {
+router.post("/quiz-questions/:id/choices", requireAuth, requireRole("employer"), requireActiveSubscription, async (req, res) => {
     try {
         const questionId = Number(req.params.id);
         const { choice_text, is_correct } = req.body;
@@ -583,7 +584,7 @@ router.post("/employee/quizzes/:id/submit", requireAuth, requireRole("employee")
     }
 });
 // PUT update quiz question
-router.put("/quiz-questions/:id", requireAuth, requireRole("employer"), async (req, res) => {
+router.put("/quiz-questions/:id", requireAuth, requireRole("employer"), requireActiveSubscription,async (req, res) => {
     try {
         const questionId = Number(req.params.id);
         const { question_text, question_type, question_order } = req.body;
@@ -639,7 +640,7 @@ router.put("/quiz-questions/:id", requireAuth, requireRole("employer"), async (r
 });
 
 // DELETE quiz question
-router.delete("/quiz-questions/:id", requireAuth, requireRole("employer"), async (req, res) => {
+router.delete("/quiz-questions/:id", requireAuth, requireRole("employer"), requireActiveSubscription, async (req, res) => {
     try {
         const questionId = Number(req.params.id);
 
@@ -679,7 +680,7 @@ router.delete("/quiz-questions/:id", requireAuth, requireRole("employer"), async
 });
 
 // PUT update quiz choice
-router.put("/quiz-choices/:id", requireAuth, requireRole("employer"), async (req, res) => {
+router.put("/quiz-choices/:id", requireAuth, requireRole("employer"), requireActiveSubscription,async (req, res) => {
     try {
         const choiceId = Number(req.params.id);
         const { choice_text, is_correct } = req.body;
@@ -727,7 +728,7 @@ router.put("/quiz-choices/:id", requireAuth, requireRole("employer"), async (req
 });
 
 // DELETE quiz choice
-router.delete("/quiz-choices/:id", requireAuth, requireRole("employer"), async (req, res) => {
+router.delete("/quiz-choices/:id", requireAuth, requireRole("employer"), requireActiveSubscription,async (req, res) => {
     try {
         const choiceId = Number(req.params.id);
 

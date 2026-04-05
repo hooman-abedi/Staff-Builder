@@ -64,13 +64,13 @@ function LoginPage() {
             localStorage.setItem("email", data.user.email);
 
             if (data.user.role === "employer") {
-                navigate("/employer");
+                navigate("/employer/training");
             } else if (data.user.role === "employee") {
                 navigate("/employee");
             } else if (data.user.role === "super_admin") {
-                navigate("/admin");
+                navigate("/admin/businesses");
             } else if (data.user.role === "support_admin") {
-                navigate("/admin");
+                navigate("/admin/users");
             } else {
                 setError("Unknown account role.");
             }

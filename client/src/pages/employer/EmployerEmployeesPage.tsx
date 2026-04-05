@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import type { BusinessSubscription } from "../../lib/getSubscriptionStatus";
+import { getSubscriptionStatus } from "../../lib/getSubscriptionStatus";
 
 type EmployeeUser = {
     id: number;
@@ -56,6 +58,12 @@ function EmployerEmployeesPage() {
     const [assignmentUserId, setAssignmentUserId] = useState("");
     const [assignmentStaffCategoryId, setAssignmentStaffCategoryId] = useState("");
 
+    const [subscription, setSubscription] = useState<BusinessSubscription | null>(null);
+    const [subscriptionError, setSubscriptionError] = useState("");
+
+    const token = localStorage.getItem("token");
+    const isExpired = subscription?.effective_status === "expired";
+
     function clearAuthAndRedirect() {
         localStorage.removeItem("token");
         localStorage.removeItem("role");
@@ -64,7 +72,6 @@ function EmployerEmployeesPage() {
     }
 
     function authHeaders(isJson = false) {
-        const token = localStorage.getItem("token");
         return {
             ...(isJson ? { "Content-Type": "application/json" } : {}),
             Authorization: `Bearer ${token}`,
@@ -155,7 +162,6 @@ function EmployerEmployeesPage() {
     }
 
     useEffect(() => {
-        const token = localStorage.getItem("token");
         const role = localStorage.getItem("role");
 
         if (!token || role !== "employer") {
@@ -166,10 +172,38 @@ function EmployerEmployeesPage() {
         loadEmployees();
         loadStaffCategories();
         loadAssignments();
+
+        async function loadSubscription() {
+            const result = await getSubscriptionStatus(apiBaseUrl, token);
+
+            if (!result.ok) {
+                if (result.status === 401) {
+                    localStorage.removeItem("token");
+                    localStorage.removeItem("role");
+                    localStorage.removeItem("email");
+                    navigate("/login");
+                    return;
+                }
+
+                setSubscriptionError(result.message);
+                return;
+            }
+
+            setSubscription(result.data);
+        }
+
+        loadSubscription();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     async function inviteEmployee(e: React.FormEvent) {
         e.preventDefault();
+
+        if (isExpired) {
+            setError("Your subscription has expired. Renew your plan to invite employees.");
+            return;
+        }
+
         setError("");
         setInviteSuccessMessage("");
         setLatestInviteLink("");
@@ -230,6 +264,11 @@ function EmployerEmployeesPage() {
     async function createEmployee(e: React.FormEvent) {
         e.preventDefault();
 
+        if (isExpired) {
+            setError("Your subscription has expired. Renew your plan to create employees.");
+            return;
+        }
+
         if (!employeeFullName.trim() || !employeeEmail.trim() || !employeePassword.trim()) {
             setError("Full name, email, and password are required");
             return;
@@ -267,6 +306,11 @@ function EmployerEmployeesPage() {
     }
 
     async function deleteEmployee(id: number) {
+        if (isExpired) {
+            setError("Your subscription has expired. Renew your plan to delete employees.");
+            return;
+        }
+
         const confirmed = window.confirm("Delete this employee?");
         if (!confirmed) return;
 
@@ -296,6 +340,11 @@ function EmployerEmployeesPage() {
 
     async function createAssignment(e: React.FormEvent) {
         e.preventDefault();
+
+        if (isExpired) {
+            setError("Your subscription has expired. Renew your plan to assign categories.");
+            return;
+        }
 
         if (!assignmentUserId || !assignmentStaffCategoryId) {
             setError("Select an employee and a staff category");
@@ -332,6 +381,11 @@ function EmployerEmployeesPage() {
     }
 
     async function deleteAssignment(id: number) {
+        if (isExpired) {
+            setError("Your subscription has expired. Renew your plan to remove assignments.");
+            return;
+        }
+
         const confirmed = window.confirm("Remove this assignment?");
         if (!confirmed) return;
 
@@ -397,6 +451,12 @@ function EmployerEmployeesPage() {
                     </div>
                 )}
 
+                {subscriptionError && (
+                    <div className="mb-8 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                        {subscriptionError}
+                    </div>
+                )}
+
                 <div className="grid gap-8 xl:grid-cols-[1.05fr_1fr]">
                     <div className="space-y-8">
                         <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
@@ -406,6 +466,12 @@ function EmployerEmployeesPage() {
                                     Send a secure setup link to a new employee.
                                 </p>
                             </div>
+
+                            {isExpired && (
+                                <div className="mb-6 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                                    Your subscription has expired. Employee creation, invitation, and account changes are disabled until you renew your plan.
+                                </div>
+                            )}
 
                             <form onSubmit={inviteEmployee} className="space-y-4">
                                 <div>
@@ -436,8 +502,8 @@ function EmployerEmployeesPage() {
 
                                 <button
                                     type="submit"
-                                    disabled={inviteLoading}
-                                    className="w-full rounded-2xl bg-sky-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-70 disabled:text-slate-300"
+                                    disabled={isExpired || inviteLoading}
+                                    className="w-full rounded-2xl border border-slate-700 bg-slate-900 px-5 py-3 font-semibold text-white transition hover:border-slate-500 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70 disabled:text-slate-300"
                                 >
                                     {inviteLoading ? "Sending Invite..." : "Send Invitation"}
                                 </button>
@@ -463,6 +529,7 @@ function EmployerEmployeesPage() {
                                         </a>
 
                                         <button
+                                            type="button"
                                             onClick={() => navigator.clipboard.writeText(latestInviteLink)}
                                             className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white transition hover:border-slate-500 hover:bg-slate-800"
                                         >
@@ -480,6 +547,12 @@ function EmployerEmployeesPage() {
                                     Create an employee directly with a password.
                                 </p>
                             </div>
+
+                            {isExpired && (
+                                <div className="mb-6 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                                    Your subscription has expired. Employee creation, invitation, and account changes are disabled until you renew your plan.
+                                </div>
+                            )}
 
                             <form onSubmit={createEmployee} className="grid gap-4 md:grid-cols-2">
                                 <div>
@@ -523,7 +596,8 @@ function EmployerEmployeesPage() {
                                 <div className="md:col-span-2">
                                     <button
                                         type="submit"
-                                        className="w-full rounded-2xl border border-slate-700 bg-slate-900 px-5 py-3 font-semibold text-white transition hover:border-slate-500 hover:bg-slate-800"
+                                        disabled={isExpired}
+                                        className="w-full rounded-2xl border border-slate-700 bg-slate-900 px-5 py-3 font-semibold text-white transition hover:border-slate-500 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70 disabled:text-slate-300"
                                     >
                                         Create Employee
                                     </button>
@@ -559,7 +633,8 @@ function EmployerEmployeesPage() {
 
                                             <button
                                                 onClick={() => deleteEmployee(employee.id)}
-                                                className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20"
+                                                disabled={isExpired}
+                                                className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-70"
                                             >
                                                 Delete
                                             </button>
@@ -578,6 +653,12 @@ function EmployerEmployeesPage() {
                                     Assign one or more training categories to each employee.
                                 </p>
                             </div>
+
+                            {isExpired && (
+                                <div className="mb-6 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                                    Your subscription has expired. Category assignment changes are disabled until you renew your plan.
+                                </div>
+                            )}
 
                             <form onSubmit={createAssignment} className="grid gap-4 md:grid-cols-2">
                                 <div>
@@ -619,7 +700,8 @@ function EmployerEmployeesPage() {
                                 <div className="md:col-span-2">
                                     <button
                                         type="submit"
-                                        className="w-full rounded-2xl bg-violet-500 px-5 py-3 font-semibold text-white transition hover:bg-violet-400"
+                                        disabled={isExpired}
+                                        className="w-full rounded-2xl bg-violet-500 px-5 py-3 font-semibold text-white transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-70"
                                     >
                                         Assign Category
                                     </button>
@@ -652,21 +734,22 @@ function EmployerEmployeesPage() {
                                                 <p className="font-semibold text-white">
                                                     {assignment.employee_name}
                                                     <span className="font-normal text-slate-400">
-                            {" "}
+                                                        {" "}
                                                         ({assignment.employee_email})
-                          </span>
+                                                    </span>
                                                 </p>
                                                 <p className="mt-1 text-sm text-slate-300">
                                                     Assigned to:{" "}
                                                     <span className="rounded-full bg-sky-500/15 px-2 py-1 text-xs font-medium text-sky-300">
-                            {assignment.staff_category_name}
-                          </span>
+                                                        {assignment.staff_category_name}
+                                                    </span>
                                                 </p>
                                             </div>
 
                                             <button
                                                 onClick={() => deleteAssignment(assignment.id)}
-                                                className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20"
+                                                disabled={isExpired}
+                                                className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-70"
                                             >
                                                 Remove
                                             </button>
@@ -697,8 +780,8 @@ function EmployerEmployeesPage() {
                                             key={category.id}
                                             className="rounded-full border border-sky-500/30 bg-sky-500/10 px-4 py-2 text-sm font-medium text-sky-300"
                                         >
-                      {category.name}
-                    </span>
+                                            {category.name}
+                                        </span>
                                     ))}
                                 </div>
                             )}

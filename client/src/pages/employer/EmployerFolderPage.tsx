@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import type { BusinessSubscription } from "../../lib/getSubscriptionStatus";
+import { getSubscriptionStatus } from "../../lib/getSubscriptionStatus";
 
 type Folder = {
     id: number;
@@ -115,6 +117,12 @@ function EmployerFolderPage() {
         Record<number, { id?: number; text: string; is_correct: boolean }[]>
     >({});
 
+    const [subscription, setSubscription] = useState<BusinessSubscription | null>(null);
+    const [subscriptionError, setSubscriptionError] = useState("");
+
+    const token = localStorage.getItem("token");
+    const isExpired = subscription?.effective_status === "expired";
+
     function clearAuthAndRedirect() {
         localStorage.removeItem("token");
         localStorage.removeItem("role");
@@ -123,7 +131,6 @@ function EmployerFolderPage() {
     }
 
     function authHeaders(isJson = false) {
-        const token = localStorage.getItem("token");
         return {
             ...(isJson ? { "Content-Type": "application/json" } : {}),
             Authorization: `Bearer ${token}`,
@@ -226,6 +233,11 @@ function EmployerFolderPage() {
     async function createQuiz(e: React.FormEvent) {
         e.preventDefault();
 
+        if (isExpired) {
+            setError("Your subscription has expired. Renew your plan to create quizzes.");
+            return;
+        }
+
         if (!id) {
             setError("Missing folder id");
             return;
@@ -307,6 +319,10 @@ function EmployerFolderPage() {
 
     async function createQuestion(e: React.FormEvent) {
         e.preventDefault();
+        if (isExpired) {
+            setError("Your subscription has expired. Renew your plan to add quiz questions.");
+            return;
+        }
 
         if (!selectedQuizId) {
             setError("Select a quiz first");
@@ -598,6 +614,10 @@ function EmployerFolderPage() {
     }
 
     async function deleteQuestion(questionId: number) {
+        if (isExpired) {
+            setError("Your subscription has expired. Renew your plan to delete quiz questions.");
+            return;
+        }
         if (!selectedQuizId) return;
 
         const confirmed = window.confirm("Delete this question?");
@@ -627,7 +647,6 @@ function EmployerFolderPage() {
     }
 
     useEffect(() => {
-        const token = localStorage.getItem("token");
         const role = localStorage.getItem("role");
 
         if (!token || role !== "employer") {
@@ -642,11 +661,36 @@ function EmployerFolderPage() {
 
         loadFolder();
         loadQuizzes();
+
+        async function loadSubscription() {
+            const result = await getSubscriptionStatus(apiBaseUrl, token);
+
+            if (!result.ok) {
+                if (result.status === 401) {
+                    localStorage.removeItem("token");
+                    localStorage.removeItem("role");
+                    localStorage.removeItem("email");
+                    navigate("/login");
+                    return;
+                }
+
+                setSubscriptionError(result.message);
+                return;
+            }
+
+            setSubscription(result.data);
+        }
+
+        loadSubscription();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
 
     async function createTrainingItem(e: React.FormEvent) {
         e.preventDefault();
+        if (isExpired) {
+            setError("Your subscription has expired. Renew your plan to add training items.");
+            return;
+        }
 
         if (!id) {
             setError("Missing folder id");
@@ -733,6 +777,11 @@ function EmployerFolderPage() {
     }
 
     async function saveEditTrainingItem(item: TrainingItem) {
+        if (isExpired) {
+            setError("Your subscription has expired. Renew your plan to edit training items.");
+            return;
+        }
+
         if (!id) {
             setError("Missing folder id");
             return;
@@ -783,6 +832,11 @@ function EmployerFolderPage() {
     }
 
     async function deleteTrainingItem(itemId: number) {
+        if (isExpired) {
+            setError("Your subscription has expired. Renew your plan to delete training items.");
+            return;
+        }
+
         const confirmed = window.confirm("Delete this training item?");
         if (!confirmed) return;
 
@@ -827,6 +881,10 @@ function EmployerFolderPage() {
     }
 
     async function saveReplaceFile(item: TrainingItem) {
+        if (isExpired) {
+            setError("Your subscription has expired. Renew your plan to replace training files.");
+            return;
+        }
         if (!replacementFile) {
             setError("Please choose a replacement file");
             return;
@@ -938,6 +996,17 @@ function EmployerFolderPage() {
                         {error}
                     </div>
                 )}
+                {subscriptionError && (
+                    <div className="mb-8 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                        {subscriptionError}
+                    </div>
+                )}
+
+                {isExpired && (
+                    <div className="mb-8 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                        Your subscription has expired. Adding, editing, replacing, deleting training items, and creating or editing quizzes are disabled until you renew your plan.
+                    </div>
+                )}
 
                 <div className="grid gap-8 xl:grid-cols-[0.95fr_1.1fr]">
                     <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-amber-500/5">
@@ -1021,14 +1090,16 @@ function EmployerFolderPage() {
 
                             <button
                                 type="submit"
-                                className="w-full rounded-2xl bg-emerald-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400"
+                                disabled={isExpired}
+                                className="w-full rounded-2xl bg-emerald-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-70 disabled:text-slate-300"
                             >
                                 Add Training Item
                             </button>
                         </form>
                     </section>
 
-                    <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-amber-500/5">
+                    <section
+                        className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-amber-500/5">
                         <div className="mb-6">
                             <h2 className="text-2xl font-semibold text-white">Folder Contents</h2>
                             <p className="mt-1 text-sm text-slate-400">
@@ -1067,7 +1138,8 @@ function EmployerFolderPage() {
                                                 <div className="flex gap-2">
                                                     <button
                                                         onClick={() => saveReplaceFile(item)}
-                                                        className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-slate-950"
+                                                        disabled={isExpired}
+                                                        className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-slate-950 disabled:cursor-not-allowed disabled:opacity-70"
                                                     >
                                                         Save File
                                                     </button>
@@ -1110,7 +1182,8 @@ function EmployerFolderPage() {
                                                 <div className="flex gap-2">
                                                     <button
                                                         onClick={() => saveEditTrainingItem(item)}
-                                                        className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-slate-950"
+                                                        disabled={isExpired}
+                                                        className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-medium text-slate-950 disabled:cursor-not-allowed disabled:opacity-70"
                                                     >
                                                         Save
                                                     </button>
@@ -1174,7 +1247,8 @@ function EmployerFolderPage() {
                                                     {(item.type === "text" || item.type === "link") && (
                                                         <button
                                                             onClick={() => startEditTrainingItem(item)}
-                                                            className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-white transition hover:border-slate-500 hover:bg-slate-800"
+                                                            disabled={isExpired}
+                                                            className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-white transition hover:border-slate-500 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
                                                         >
                                                             Edit
                                                         </button>
@@ -1183,7 +1257,8 @@ function EmployerFolderPage() {
                                                     {(item.type === "document" || item.type === "video") && (
                                                         <button
                                                             onClick={() => startReplaceFile(item)}
-                                                            className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-white transition hover:border-slate-500 hover:bg-slate-800"
+                                                            disabled={isExpired}
+                                                            className="rounded-xl border border-slate-700 px-4 py-2 text-sm font-medium text-white transition hover:border-slate-500 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
                                                         >
                                                             Replace File
                                                         </button>
@@ -1191,7 +1266,8 @@ function EmployerFolderPage() {
 
                                                     <button
                                                         onClick={() => deleteTrainingItem(item.id)}
-                                                        className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20"
+                                                        disabled={isExpired}
+                                                        className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-70"
                                                     >
                                                         Delete
                                                     </button>
@@ -1243,7 +1319,8 @@ function EmployerFolderPage() {
 
                             <button
                                 type="submit"
-                                className="w-full rounded-2xl bg-violet-500 px-5 py-3 font-semibold text-white transition hover:bg-violet-400"
+                                disabled={isExpired}
+                                className="w-full rounded-2xl bg-violet-500 px-5 py-3 font-semibold text-white transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-70"
                             >
                                 Create Quiz
                             </button>
@@ -1275,7 +1352,8 @@ function EmployerFolderPage() {
 
                                                 <button
                                                     onClick={() => loadQuizDetails(quiz.id)}
-                                                    className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-2 text-sm font-medium text-violet-300 transition hover:bg-violet-500/20"
+                                                    disabled={isExpired}
+                                                    className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-2 text-sm font-medium text-violet-300 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-70"
                                                 >
                                                     Open Quiz Builder
                                                 </button>
@@ -1363,7 +1441,8 @@ function EmployerFolderPage() {
                                                 <button
                                                     type="button"
                                                     onClick={addChoiceInput}
-                                                    className="rounded-xl border border-slate-700 px-3 py-2 text-xs font-medium text-white transition hover:border-slate-500 hover:bg-slate-800"
+                                                    disabled={isExpired}
+                                                    className="rounded-xl border border-slate-700 px-3 py-2 text-xs font-medium text-white transition hover:border-slate-500 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
                                                 >
                                                     Add Choice
                                                 </button>
@@ -1405,7 +1484,8 @@ function EmployerFolderPage() {
 
                                     <button
                                         type="submit"
-                                        className="w-full rounded-2xl bg-violet-500 px-5 py-3 font-semibold text-white transition hover:bg-violet-400"
+                                        disabled={isExpired}
+                                        className="w-full rounded-2xl bg-violet-500 px-5 py-3 font-semibold text-white transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-70"
                                     >
                                         Add Question
                                     </button>
@@ -1465,7 +1545,8 @@ function EmployerFolderPage() {
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => addEditingChoice(question.id)}
-                                                                        className="rounded-xl border border-slate-700 px-3 py-2 text-xs font-medium text-white transition hover:border-slate-500 hover:bg-slate-800"
+                                                                        disabled={isExpired}
+                                                                        className="rounded-xl border border-slate-700 px-3 py-2 text-xs font-medium text-white transition hover:border-slate-500 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
                                                                     >
                                                                         Add Choice
                                                                     </button>
@@ -1508,7 +1589,8 @@ function EmployerFolderPage() {
                                                             <div className="flex flex-wrap gap-2">
                                                                 <button
                                                                     onClick={() => saveQuestionEdit(question.id)}
-                                                                    className="rounded-xl bg-violet-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-400"
+                                                                    disabled={isExpired}
+                                                                    className="rounded-xl bg-violet-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-70"
                                                                 >
                                                                     Save Changes
                                                                 </button>
@@ -1553,14 +1635,16 @@ function EmployerFolderPage() {
                                                             <div className="mt-4 flex flex-wrap gap-2">
                                                                 <button
                                                                     onClick={() => startEditQuestion(question)}
-                                                                    className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-2 text-sm font-medium text-violet-300 transition hover:bg-violet-500/20"
+                                                                    disabled={isExpired}
+                                                                    className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-2 text-sm font-medium text-violet-300 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-70"
                                                                 >
                                                                     Edit Question
                                                                 </button>
 
                                                                 <button
                                                                     onClick={() => deleteQuestion(question.id)}
-                                                                    className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20"
+                                                                    disabled={isExpired}
+                                                                    className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-70"
                                                                 >
                                                                     Delete Question
                                                                 </button>

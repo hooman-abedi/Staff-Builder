@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { requireAuth, requireRole } = require("../middleware/auth");
 const pool = require("../db");
+const { requireActiveSubscription } = require("../middleware/subscription");
 
 // GET all assignments for this business
 router.get("/assignments", requireAuth, requireRole("employer"), async (req, res) => {
@@ -32,7 +33,7 @@ router.get("/assignments", requireAuth, requireRole("employer"), async (req, res
 });
 
 // POST create assignment
-router.post("/assignments", requireAuth, requireRole("employer"), async (req, res) => {
+router.post("/assignments", requireAuth, requireRole("employer"), requireActiveSubscription, async (req, res) => {
     try {
         const { user_id, staff_category_id } = req.body;
 
@@ -91,7 +92,7 @@ router.post("/assignments", requireAuth, requireRole("employer"), async (req, re
 });
 
 // DELETE assignment
-router.delete("/assignments/:id", requireAuth, requireRole("employer"), async (req, res) => {
+router.delete("/assignments/:id", requireAuth, requireRole("employer"), requireActiveSubscription,async (req, res) => {
     try {
         const id = Number(req.params.id);
 

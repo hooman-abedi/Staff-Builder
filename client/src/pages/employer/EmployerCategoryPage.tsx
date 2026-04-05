@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import type { BusinessSubscription } from "../../lib/getSubscriptionStatus";
+import { getSubscriptionStatus } from "../../lib/getSubscriptionStatus";
 
 type StaffCategory = {
     id: number;
@@ -31,6 +33,12 @@ function EmployerCategoryPage() {
     const [folderName, setFolderName] = useState("");
     const [folderDescription, setFolderDescription] = useState("");
 
+    const [subscription, setSubscription] = useState<BusinessSubscription | null>(null);
+    const [subscriptionError, setSubscriptionError] = useState("");
+
+    const token = localStorage.getItem("token");
+    const isExpired = subscription?.effective_status === "expired";
+
     function clearAuthAndRedirect() {
         localStorage.removeItem("token");
         localStorage.removeItem("role");
@@ -39,7 +47,6 @@ function EmployerCategoryPage() {
     }
 
     function authHeaders(isJson = false) {
-        const token = localStorage.getItem("token");
         return {
             ...(isJson ? { "Content-Type": "application/json" } : {}),
             Authorization: `Bearer ${token}`,
@@ -111,7 +118,6 @@ function EmployerCategoryPage() {
     }
 
     useEffect(() => {
-        const token = localStorage.getItem("token");
         const role = localStorage.getItem("role");
 
         if (!token || role !== "employer") {
@@ -120,11 +126,37 @@ function EmployerCategoryPage() {
         }
 
         loadPageData();
+
+        async function loadSubscription() {
+            const result = await getSubscriptionStatus(apiBaseUrl, token);
+
+            if (!result.ok) {
+                if (result.status === 401) {
+                    localStorage.removeItem("token");
+                    localStorage.removeItem("role");
+                    localStorage.removeItem("email");
+                    navigate("/login");
+                    return;
+                }
+
+                setSubscriptionError(result.message);
+                return;
+            }
+
+            setSubscription(result.data);
+        }
+
+        loadSubscription();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id]);
 
     async function createFolder(e: React.FormEvent) {
         e.preventDefault();
+
+        if (isExpired) {
+            setError("Your subscription has expired. Renew your plan to create folders.");
+            return;
+        }
 
         if (!id) {
             setError("Missing category id");
@@ -167,6 +199,10 @@ function EmployerCategoryPage() {
     }
 
     async function deleteFolder(folderId: number) {
+        if (isExpired) {
+            setError("Your subscription has expired. Renew your plan to delete folders.");
+            return;
+        }
         const confirmed = window.confirm("Delete this folder?");
         if (!confirmed) return;
 
@@ -225,6 +261,11 @@ function EmployerCategoryPage() {
                         {error}
                     </div>
                 )}
+                {subscriptionError && (
+                    <div className="mb-8 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                        {subscriptionError}
+                    </div>
+                )}
 
                 <div className="grid gap-8 xl:grid-cols-[0.95fr_1.1fr]">
                     <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6">
@@ -234,6 +275,12 @@ function EmployerCategoryPage() {
                                 Add a folder inside this category.
                             </p>
                         </div>
+
+                        {isExpired && (
+                            <div className="mb-6 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                                Your subscription has expired. Creating or deleting folders is disabled until you renew your plan.
+                            </div>
+                        )}
 
                         <form onSubmit={createFolder} className="space-y-4">
                             <div>
@@ -262,7 +309,8 @@ function EmployerCategoryPage() {
 
                             <button
                                 type="submit"
-                                className="w-full rounded-2xl bg-amber-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-amber-400"
+                                disabled={isExpired}
+                                className="w-full rounded-2xl bg-amber-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-70 disabled:text-slate-300"
                             >
                                 Create Folder
                             </button>
@@ -308,7 +356,8 @@ function EmployerCategoryPage() {
 
                                             <button
                                                 onClick={() => deleteFolder(folder.id)}
-                                                className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20"
+                                                disabled={isExpired}
+                                                className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-70"
                                             >
                                                 Delete
                                             </button>
