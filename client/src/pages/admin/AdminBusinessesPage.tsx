@@ -49,6 +49,11 @@ function AdminBusinessesPage() {
                 return;
             }
 
+            if (res.status === 403) {
+                setError("You do not have permission to view admin businesses.");
+                return;
+            }
+
             if (!res.ok) {
                 setError(data.message || "Failed to load businesses");
                 return;
@@ -62,12 +67,16 @@ function AdminBusinessesPage() {
             setLoading(false);
         }
     }
-
     useEffect(() => {
         const token = localStorage.getItem("token");
         const role = localStorage.getItem("role");
 
-        if (!token || role !== "super_admin") {
+        if (!token) {
+            navigate("/login");
+            return;
+        }
+
+        if (role !== "super_admin" && role !== "support_admin") {
             navigate("/login");
             return;
         }
@@ -124,8 +133,11 @@ function AdminBusinessesPage() {
                                 </thead>
                                 <tbody>
                                 {businesses.map((business) => (
-                                    <tr key={business.id} className="border-b border-slate-800 last:border-b-0">
-                                        <td className="px-4 py-3 text-white">{business.id}</td>
+                                    <tr
+                                        key={business.id}
+                                        onClick={() => navigate(`/admin/businesses/${business.id}`)}
+                                        className="cursor-pointer border-b border-slate-800 last:border-b-0 transition hover:bg-slate-800/40"
+                                    >                                        <td className="px-4 py-3 text-white">{business.id}</td>
                                         <td className="px-4 py-3 text-white">{business.name}</td>
                                         <td className="px-4 py-3 text-slate-300">{business.subscription_plan}</td>
                                         <td className="px-4 py-3 text-slate-300">{business.subscription_status}</td>

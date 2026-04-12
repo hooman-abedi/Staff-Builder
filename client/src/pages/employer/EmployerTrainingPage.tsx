@@ -10,6 +10,19 @@ type StaffCategory = {
     created_at: string;
 };
 
+type SubscriptionRequest = {
+    id: number;
+    business_id: number;
+    requested_by_user_id: number;
+    requested_plan: string;
+    requested_max_employees: number;
+    status: string;
+    admin_note: string | null;
+    reviewed_by_user_id: number | null;
+    reviewed_at: string | null;
+    created_at: string;
+};
+
 function EmployerTrainingPage() {
     const navigate = useNavigate();
     const apiBaseUrl = import.meta.env.VITE_API_BASE_URL as string;
@@ -22,8 +35,10 @@ function EmployerTrainingPage() {
     const [staffCategoryDescription, setStaffCategoryDescription] = useState("");
 
     const [subscription, setSubscription] = useState<BusinessSubscription | null>(null);
-
     const [loadingSubscription, setLoadingSubscription] = useState(true);
+
+    const [subscriptionRequests, setSubscriptionRequests] = useState<SubscriptionRequest[]>([]);
+    const [loadingRequests, setLoadingRequests] = useState(true);
 
     const token = localStorage.getItem("token");
     const isExpired = subscription?.effective_status === "expired";
@@ -75,6 +90,7 @@ function EmployerTrainingPage() {
             setLoadingCategories(false);
         }
     }
+
     async function loadSubscription() {
         try {
             setLoadingSubscription(true);
@@ -99,30 +115,57 @@ function EmployerTrainingPage() {
             setLoadingSubscription(false);
         }
     }
-    async function upgradePlan(plan: string) {
-        try {
-            setError("");
 
-            const res = await fetch(`${apiBaseUrl}/api/business/subscription`, {
-                method: "PUT",
-                headers: authHeaders(true),
-                body: JSON.stringify({ plan }),
+    async function loadSubscriptionRequests() {
+        try {
+            setLoadingRequests(true);
+
+            const res = await fetch(`${apiBaseUrl}/api/subscription-requests/me`, {
+                headers: authHeaders(),
             });
 
             const data = await handleJsonResponse(res);
             if (!data) return;
 
             if (!res.ok) {
-                setError(data.message || "Failed to upgrade plan");
+                setError(data.message || "Failed to load subscription requests");
                 return;
             }
 
-            await loadSubscription();
+            setSubscriptionRequests(data);
         } catch (err) {
-            console.error("Upgrade error:", err);
-            setError("Something went wrong while upgrading");
+            console.error("Load subscription requests error:", err);
+            setError("Something went wrong while loading subscription requests");
+        } finally {
+            setLoadingRequests(false);
         }
     }
+
+    async function requestPlanChange(requestedPlan: string) {
+        try {
+            setError("");
+
+            const res = await fetch(`${apiBaseUrl}/api/subscription-requests`, {
+                method: "POST",
+                headers: authHeaders(true),
+                body: JSON.stringify({ requested_plan: requestedPlan }),
+            });
+
+            const data = await handleJsonResponse(res);
+            if (!data) return;
+
+            if (!res.ok) {
+                setError(data.message || "Failed to create subscription request");
+                return;
+            }
+
+            await loadSubscriptionRequests();
+        } catch (err) {
+            console.error("Create subscription request error:", err);
+            setError("Something went wrong while creating subscription request");
+        }
+    }
+
     useEffect(() => {
         const role = localStorage.getItem("role");
 
@@ -131,9 +174,9 @@ function EmployerTrainingPage() {
             return;
         }
 
-
         loadStaffCategories();
         loadSubscription();
+        loadSubscriptionRequests();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -240,82 +283,140 @@ function EmployerTrainingPage() {
                         </div>
                     </div>
                 </div>
+
                 <div className="mb-8 rounded-3xl border border-slate-800 bg-slate-900/70 p-6">
-                    <h2 className="text-xl font-semibold text-white mb-4">
-                        Subscription
-                    </h2>
+                    <h2 className="mb-4 text-xl font-semibold text-white">Subscription</h2>
 
                     {loadingSubscription ? (
                         <p className="text-slate-400">Loading subscription...</p>
                     ) : (
                         <>
-                            <p className="text-slate-300 mb-2">
+                            <p className="mb-2 text-slate-300">
                                 Plan:{" "}
                                 <span className="font-semibold text-white">
-                    {subscription?.subscription_plan || "free"}
-                </span>
+                                    {subscription?.subscription_plan || "free"}
+                                </span>
                             </p>
 
-                            <p className="text-slate-300 mb-4">
+                            <p className="mb-4 text-slate-300">
                                 Status:{" "}
                                 <span
                                     className={
-                                        subscription?.effective_status === "active"                                            ? "text-emerald-400"
+                                        subscription?.effective_status === "active"
+                                            ? "text-emerald-400"
                                             : "text-red-400"
                                     }
                                 >
-                    {subscription?.effective_status || "inactive"}
-                </span>
+                                    {subscription?.effective_status || "inactive"}
+                                </span>
                             </p>
 
                             <div className="flex flex-wrap gap-3">
                                 <button
                                     type="button"
-                                    onClick={() => upgradePlan("basic")}
+                                    onClick={() => requestPlanChange("basic")}
                                     className="rounded-xl bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950"
                                 >
                                     Basic
                                 </button>
 
                                 <button
-                                    onClick={() => upgradePlan("growth")}
+                                    type="button"
+                                    onClick={() => requestPlanChange("growth")}
                                     className="rounded-xl bg-violet-500 px-4 py-2 text-sm font-semibold text-white"
                                 >
                                     Growth
                                 </button>
 
                                 <button
-                                    onClick={() => upgradePlan("enterprise")}
+                                    type="button"
+                                    onClick={() => requestPlanChange("enterprise")}
                                     className="rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-slate-950"
                                 >
                                     Enterprise
                                 </button>
+                            </div>
+
+                            <div className="mt-6 border-t border-slate-800 pt-6">
+                                <h3 className="text-lg font-semibold text-white">Subscription Requests</h3>
+
+                                {loadingRequests ? (
+                                    <p className="mt-3 text-slate-400">Loading requests...</p>
+                                ) : subscriptionRequests.length === 0 ? (
+                                    <p className="mt-3 text-slate-400">No subscription requests yet.</p>
+                                ) : (
+                                    <div className="mt-4 space-y-3">
+                                        {subscriptionRequests.map((request) => (
+                                            <div
+                                                key={request.id}
+                                                className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4"
+                                            >
+                                                <p className="text-white">
+                                                    Requested plan:{" "}
+                                                    <span className="font-semibold">{request.requested_plan}</span>
+                                                </p>
+
+                                                <div className="mt-2 flex flex-wrap items-center gap-3">
+            <span
+                className={
+                    request.status === "approved"
+                        ? "rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-semibold text-emerald-300"
+                        : request.status === "rejected"
+                            ? "rounded-full bg-red-500/15 px-3 py-1 text-xs font-semibold text-red-300"
+                            : "rounded-full bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-300"
+                }
+            >
+                {request.status === "approved"
+                    ? "Approved"
+                    : request.status === "rejected"
+                        ? "Rejected"
+                        : "Pending Review"}
+            </span>
+                                                </div>
+
+                                                <p className="mt-1 text-sm text-slate-400">
+                                                    Requested employee limit: {request.requested_max_employees}
+                                                </p>
+
+                                                <p className="mt-1 text-sm text-slate-500">
+                                                    Requested on: {new Date(request.created_at).toLocaleString()}
+                                                </p>
+
+                                                {request.admin_note && (
+                                                    <div className="mt-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3">
+                                                        <p className="text-xs font-semibold uppercase tracking-wide text-amber-300">
+                                                            Admin Note
+                                                        </p>
+                                                        <p className="mt-1 text-sm text-amber-100">{request.admin_note}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </>
                     )}
                 </div>
 
                 {error && (
-                    <div
-                        className="mb-8 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                    <div className="mb-8 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
                         {error}
                     </div>
                 )}
 
-
                 <div className="grid gap-8 xl:grid-cols-[0.95fr_1.1fr]">
-                    <section
-                        className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
+                    <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
                         <div className="mb-6">
                             <h2 className="text-2xl font-semibold text-white">Create Staff Category</h2>
                             <p className="mt-1 text-sm text-slate-400">
                                 Categories group training by role, such as Manager or Instructor.
                             </p>
+
                         </div>
 
                         {isExpired && (
-                            <div
-                                className="mb-6 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+                            <div className="mb-6 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
                                 Your subscription has expired. Creating or deleting training categories is disabled
                                 until you renew your plan.
                             </div>
@@ -356,13 +457,13 @@ function EmployerTrainingPage() {
                         </form>
                     </section>
 
-                    <section
-                        className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
+                    <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
                         <div className="mb-6">
                             <h2 className="text-2xl font-semibold text-white">Categories</h2>
                             <p className="mt-1 text-sm text-slate-400">
                                 Open a category to enter its folder workspace.
                             </p>
+
                         </div>
 
                         {loadingCategories ? (

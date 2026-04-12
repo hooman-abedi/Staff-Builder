@@ -20,6 +20,7 @@ function AdminUsersPage() {
     const [error, setError] = useState("");
 
     function clearAuthAndRedirect() {
+
         localStorage.removeItem("token");
         localStorage.removeItem("role");
         localStorage.removeItem("email");
@@ -46,6 +47,11 @@ function AdminUsersPage() {
                 return;
             }
 
+            if (res.status === 403) {
+                setError("You do not have permission to view admin users.");
+                return;
+            }
+
             if (!res.ok) {
                 setError(data.message || "Failed to load users");
                 return;
@@ -59,12 +65,80 @@ function AdminUsersPage() {
             setLoading(false);
         }
     }
+    async function impersonateUser(userId: number) {
+        try {
+            setError("");
+
+
+            const token = localStorage.getItem("token");
+
+            const res = await fetch(`${apiBaseUrl}/api/admin/impersonate/${userId}`, {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            const data = await res.json();
+
+            if (res.status === 401) {
+                clearAuthAndRedirect();
+                return;
+            }
+
+            if (!res.ok) {
+                setError(data.message || "Failed to impersonate user");
+                return;
+            }
+            
+            const currentAdminToken = localStorage.getItem("token");
+            const currentAdminRole = localStorage.getItem("role");
+            const currentAdminEmail = localStorage.getItem("email");
+
+            if (currentAdminToken) {
+                localStorage.setItem("admin_return_token", currentAdminToken);
+            }
+            if (currentAdminRole) {
+                localStorage.setItem("admin_return_role", currentAdminRole);
+            }
+            if (currentAdminEmail) {
+                localStorage.setItem("admin_return_email", currentAdminEmail);
+            }
+
+            localStorage.setItem("token", data.token);
+            localStorage.setItem("role", data.role);
+            localStorage.setItem("email", data.email);
+            localStorage.setItem("impersonating", "true");
+            localStorage.setItem("admin_return_role", "super_admin");
+            localStorage.setItem("admin_return_email", "superadmin@test.com");
+
+            if (data.role === "employer") {
+                navigate("/employer");
+                return;
+            }
+
+            if (data.role === "employee") {
+                navigate("/employee");
+                return;
+            }
+
+            setError("Unsupported impersonation role");
+        } catch (err) {
+            console.error("Impersonate user error:", err);
+            setError("Something went wrong while impersonating user");
+        }
+    }
 
     useEffect(() => {
         const token = localStorage.getItem("token");
         const role = localStorage.getItem("role");
 
-        if (!token || role !== "super_admin") {
+        if (!token) {
+            navigate("/login");
+            return;
+        }
+
+        if (role !== "super_admin" && role !== "support_admin") {
             navigate("/login");
             return;
         }
@@ -116,6 +190,7 @@ function AdminUsersPage() {
                                     <th className="px-4 py-3">Email</th>
                                     <th className="px-4 py-3">Role</th>
                                     <th className="px-4 py-3">Business</th>
+                                    <th className="px-4 py-3">Actions</th>
                                 </tr>
                                 </thead>
                                 <tbody>
@@ -127,6 +202,18 @@ function AdminUsersPage() {
                                         <td className="px-4 py-3 text-slate-300">{user.role}</td>
                                         <td className="px-4 py-3 text-slate-300">
                                             {user.business_name || "Internal Platform"}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            {(user.role === "employer" || user.role === "employee") ? (
+                                                <button
+                                                    onClick={() => impersonateUser(user.id)}
+                                                    className="rounded-xl bg-sky-500 px-3 py-1 text-xs font-semibold text-slate-950 hover:bg-sky-400"
+                                                >
+                                                    Enter
+                                                </button>
+                                            ) : (
+                                                <span className="text-slate-500">-</span>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
@@ -140,4 +227,4 @@ function AdminUsersPage() {
     );
 }
 
-export default AdminUsersPage;``
+export default AdminUsersPage;

@@ -127,4 +127,136 @@ router.put("/business/subscription", requireAuth, async (req, res) => {
         res.status(500).json({ message: "Server error" });
     }
 });
+
+router.get("/subscription-requests/me", requireAuth, async (req, res) => {
+    try {
+        if (req.user.role !== "employer") {
+            return res.status(403).json({ message: "Access denied" });
+        }
+
+        const result = await pool.query(
+            `
+            SELECT
+                sr.id,
+                sr.business_id,
+                sr.requested_by_user_id,
+                sr.requested_plan,
+                sr.requested_max_employees,
+                sr.status,
+                sr.admin_note,
+                sr.reviewed_by_user_id,
+                sr.reviewed_at,
+                sr.created_at
+            FROM subscription_requests sr
+            WHERE sr.business_id = $1
+            ORDER BY sr.created_at DESC
+            `,
+            [req.user.businessId]
+        );
+
+        res.json(result.rows);
+    } catch (err) {
+        console.error("Get employer subscription requests error:", err);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+});
+
+router.post("/subscription-requests", requireAuth, async (req, res) => {
+    try {
+        if (req.user.role !== "employer") {
+            return res.status(403).json({ message: "Access denied" });
+        }
+
+        const { requested_plan } = req.body;
+
+        if (!requested_plan) {
+            return res.status(400).json({ message: "Requested plan is required" });
+        }
+
+        let requestedMaxEmployees = 5;
+
+        if (requested_plan === "basic") requestedMaxEmployees = 10;
+        if (requested_plan === "growth") requestedMaxEmployees = 25;
+        if (requested_plan === "enterprise") requestedMaxEmployees = 100;
+
+        const existingPending = await pool.query(
+            `
+            SELECT id
+            FROM subscription_requests
+            WHERE business_id = $1
+              AND status = 'pending'
+            ORDER BY created_at DESC
+            LIMIT 1
+            `,
+            [req.user.businessId]
+        );
+
+        if (existingPending.rowCount > 0) {
+            return res.status(400).json({
+                message: "A pending subscription request already exists for this business",
+            });
+        }
+
+        const result = await pool.query(
+            `
+            INSERT INTO subscription_requests (
+                business_id,
+                requested_by_user_id,
+                requested_plan,
+                requested_max_employees,
+                status
+            )
+            VALUES ($1, $2, $3, $4, 'pending')
+            RETURNING *
+            `,
+            [
+                req.user.businessId,
+                req.user.userId,
+                requested_plan,
+                requestedMaxEmployees,
+            ]
+        );
+
+        const createdRequest = result.rows[0];
+
+        const adminUsersResult = await pool.query(
+            `
+    SELECT id
+    FROM users
+    WHERE role IN ('super_admin', 'support_admin')
+    `
+        );
+
+        for (const adminUser of adminUsersResult.rows) {
+            await pool.query(
+                `
+        INSERT INTO notifications (
+            user_id,
+            type,
+            title,
+            message,
+            related_business_id,
+            related_request_id
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+        `,
+                [
+                    adminUser.id,
+                    "subscription_request_submitted",
+                    "New Subscription Request",
+                    `A business submitted a ${requested_plan} subscription request.`,
+                    req.user.businessId,
+                    createdRequest.id,
+                ]
+            );
+        }
+
+        res.status(201).json(createdRequest);
+
+    } catch (err) {
+        console.error("Create subscription request error:", err);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+});
+
 module.exports = router;

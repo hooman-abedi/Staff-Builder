@@ -15,6 +15,7 @@ const completionsRoutes = require("./routes/completions.routes");
 const quizRoutes = require("./routes/quizzes.routes");
 const businessRoutes = require("./routes/business.routes");
 const adminRoutes = require("./routes/admin.routes");
+const notificationsRoutes = require("./routes/notifications.routes");
 
 pool.query("SELECT NOW()")
     .then(result => {
@@ -22,6 +23,20 @@ pool.query("SELECT NOW()")
     })
     .catch(err => {
         console.error("Database connection error:", err);
+    });
+pool.query("SELECT current_database(), current_user, inet_server_addr(), inet_server_port()")
+    .then(result => {
+        console.log("DB info:", result.rows[0]);
+    })
+    .catch(err => {
+        console.error("DB info error:", err);
+    });
+pool.query("SELECT current_database(), current_user")
+    .then(result => {
+        console.log("DB info:", result.rows[0]);
+    })
+    .catch(err => {
+        console.error("DB info error:", err);
     });
 const app = express();
 // Allow requests from your React dev server (http://localhost:5173)
@@ -58,6 +73,7 @@ app.use("/api", completionsRoutes);
 app.use("/api", quizRoutes);
 app.use("/api", businessRoutes);
 app.use("/api", adminRoutes);
+app.use("/api", notificationsRoutes);
 
 const PORT = 5050;
 

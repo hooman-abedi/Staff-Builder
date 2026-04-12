@@ -1,15 +1,31 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+type AdminNotification = {
+    id: number;
+    user_id: number;
+    type: string;
+    title: string;
+    message: string;
+    is_read: boolean;
+    related_business_id: number | null;
+    related_request_id: number | null;
+    created_at: string;
+};
+
 function AdminHomePage() {
     const navigate = useNavigate();
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL as string;
 
-    const [email, setEmail] = useState("");
-    const [role, setRole] = useState("");
+    const [email] = useState(() => localStorage.getItem("email") || "");
+    const [role] = useState(() => localStorage.getItem("role") || "");
+    const [pendingSubscriptionRequests, setPendingSubscriptionRequests] = useState(0);
+    const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+
+
     useEffect(() => {
         const token = localStorage.getItem("token");
         const savedRole = localStorage.getItem("role");
-        const savedEmail = localStorage.getItem("email");
 
         if (!token) {
             navigate("/login");
@@ -21,19 +37,105 @@ function AdminHomePage() {
             return;
         }
 
-        // FIX: wrap state updates in microtask
-        Promise.resolve().then(() => {
-            setRole(savedRole || "");
-            setEmail(savedEmail || "");
-        });
-    }, [navigate]);
+        let cancelled = false;
+
+        async function init() {
+            try {
+                const res = await fetch(`${apiBaseUrl}/api/admin/subscription-requests`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+
+                if (!res.ok) {
+                    return;
+                }
+
+                const data = await res.json();
+
+                if (cancelled) return;
+
+                const pendingCount = (data || []).filter(
+                    (request: { status: string }) => request.status === "pending"
+                ).length;
+
+                setPendingSubscriptionRequests(pendingCount);
+
+                const notificationsRes = await fetch(`${apiBaseUrl}/api/admin/notifications`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+
+                if (notificationsRes.ok) {
+                    const notificationsData = await notificationsRes.json();
+
+                    if (!cancelled) {
+                        setNotifications(notificationsData);
+                    }
+                }
+            } catch (err) {
+                console.error("Load pending subscription requests error:", err);
+            }
+        }
+
+        init();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [apiBaseUrl, navigate]);
 
     function handleLogout() {
         localStorage.removeItem("token");
         localStorage.removeItem("role");
         localStorage.removeItem("email");
+        localStorage.removeItem("impersonating");
+        localStorage.removeItem("admin_return_token");
+        localStorage.removeItem("admin_return_role");
+        localStorage.removeItem("admin_return_email");
         navigate("/login");
     }
+    async function markNotificationAsRead(notificationId: number) {
+        try {
+            const token = localStorage.getItem("token");
+
+            const res = await fetch(`${apiBaseUrl}/api/admin/notifications/${notificationId}/read`, {
+                method: "PUT",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            if (!res.ok) {
+                return;
+            }
+
+            setNotifications((prev) =>
+                prev.map((notification) =>
+                    notification.id === notificationId
+                        ? { ...notification, is_read: true }
+                        : notification
+                )
+            );
+        } catch (err) {
+            console.error("Mark notification as read error:", err);
+        }
+    }
+
+    function openNotification(notification: AdminNotification) {
+        if (notification.related_request_id) {
+            navigate("/admin/subscription-requests");
+            return;
+        }
+
+        if (notification.related_business_id) {
+            navigate(`/admin/businesses/${notification.related_business_id}`);
+            return;
+        }
+    }
+
+    const unreadCount = notifications.filter((n) => !n.is_read).length;
 
     return (
         <div className="min-h-[calc(100vh-160px)] bg-slate-950 px-6 py-14 text-white md:px-10">
@@ -74,13 +176,24 @@ function AdminHomePage() {
                     </div>
                 </div>
 
+                <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6">
+                    <p className="text-sm text-slate-400">Notifications</p>
+
+                    <p className="mt-3 text-2xl font-bold text-white">
+                        {unreadCount}
+                    </p>
+
+                    <p className="mt-3 text-sm leading-6 text-slate-300">
+                        Unread system notifications.
+                    </p>
+                </div>
 
                 <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6">
-                        <p className="text-sm text-slate-400">Platform Role</p>
-                        <p className="mt-3 text-2xl font-bold text-white">Admin</p>
+                        <p className="text-sm text-slate-400">Subscription Requests</p>
+                        <p className="mt-3 text-2xl font-bold text-white">{pendingSubscriptionRequests}</p>
                         <p className="mt-3 text-sm leading-6 text-slate-300">
-                            Internal unrestricted platform access for testing and support.
+                            Pending subscription requests waiting for admin review.
                         </p>
                     </div>
 
@@ -88,7 +201,7 @@ function AdminHomePage() {
                         <p className="text-sm text-slate-400">Customer Support</p>
                         <p className="mt-3 text-2xl font-bold text-white">Enabled</p>
                         <p className="mt-3 text-sm leading-6 text-slate-300">
-                            Admin can later view and update employer and employee accounts.
+                            Admin can view and update employer and employee accounts.
                         </p>
                     </div>
 
@@ -115,8 +228,8 @@ function AdminHomePage() {
                         <ul className="mt-4 space-y-3 text-slate-300">
                             <li>• Internal testing without normal customer plan restrictions</li>
                             <li>• Platform-level access separate from employer and employee roles</li>
-                            <li>• Future account support for employers and employees</li>
-                            <li>• Future subscription and trial management tools</li>
+                            <li>• Account support for employers and employees</li>
+                            <li>• Subscription and trial management tools</li>
                         </ul>
                     </section>
 
@@ -137,11 +250,87 @@ function AdminHomePage() {
                             >
                                 View Users
                             </button>
+
+                            <button
+                                onClick={() => navigate("/admin/search")}
+                                className="rounded-2xl border border-slate-700 px-5 py-3 font-semibold text-white transition hover:border-slate-500 hover:bg-slate-800"
+                            >
+                                Global Search
+                            </button>
+
+                            <button
+                                onClick={() => navigate("/admin/subscription-requests")}
+                                className="rounded-2xl border border-slate-700 px-5 py-3 font-semibold text-white transition hover:border-slate-500 hover:bg-slate-800"
+                            >
+                                Subscription Requests
+                                {pendingSubscriptionRequests > 0 ? ` (${pendingSubscriptionRequests})` : ""}
+                            </button>
                         </div>
 
                         <p className="mt-4 text-sm leading-6 text-slate-300">
-                            Use these tools to monitor businesses, inspect users, and prepare future support actions.
+                            Use these tools to monitor businesses, inspect users, and review platform actions.
                         </p>
+                    </section>
+                    <section className="mt-8 rounded-3xl border border-slate-800 bg-slate-900/80 p-6">
+                        <h2 className="text-2xl font-semibold text-white">Recent Notifications</h2>
+                        <p className="mt-1 text-sm text-slate-400">
+                            Latest admin-facing platform updates and subscription events.
+                        </p>
+
+                        {notifications.length === 0 ? (
+                            <div
+                                className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-5 text-slate-400">
+                                No notifications yet.
+                            </div>
+                        ) : (
+                            <div className="mt-4 space-y-3">
+                                {notifications.map((notification) => (
+                                    <div
+                                        key={notification.id}
+                                        onClick={() => openNotification(notification)}
+                                        className={`rounded-2xl border p-4 cursor-pointer transition hover:border-slate-600 ${
+                                            notification.is_read
+                                                ? "border-slate-800 bg-slate-950/70"
+                                                : "border-amber-500/30 bg-amber-500/5"
+                                        }`}
+                                    >
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                            <p className="font-semibold text-white">{notification.title}</p>
+
+                                            <div className="flex items-center gap-2">
+        <span
+            className={
+                notification.is_read
+                    ? "rounded-full bg-slate-700 px-3 py-1 text-xs font-semibold text-slate-300"
+                    : "rounded-full bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-300"
+            }
+        >
+            {notification.is_read ? "Read" : "Unread"}
+        </span>
+
+                                                {!notification.is_read && (
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            markNotificationAsRead(notification.id);
+                                                        }}
+                                                        className="rounded-xl bg-sky-500 px-3 py-1 text-xs font-semibold text-slate-950 hover:bg-sky-400"
+                                                    >
+                                                        Mark Read
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <p className="mt-2 text-sm text-slate-300">{notification.message}</p>
+
+                                        <p className="mt-2 text-xs text-slate-500">
+                                            {new Date(notification.created_at).toLocaleString()}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </section>
                 </div>
             </div>

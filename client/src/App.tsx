@@ -20,6 +20,9 @@ import EmployeeQuizPage from "./pages/employee/EmployeeQuizPage";
 import AdminHomePage from "./pages/admin/AdminHomePage";
 import AdminBusinessesPage from "./pages/admin/AdminBusinessesPage";
 import AdminUsersPage from "./pages/admin/AdminUsersPage";
+import AdminSearchPage from "./pages/admin/AdminSearchPage";
+import AdminBusinessDetailPage from "./pages/admin/AdminBusinessDetailPage";
+import AdminSubscriptionRequestsPage from "./pages/admin/AdminSubscriptionRequestsPage";
 
 function App() {
     return (
@@ -147,7 +150,35 @@ function App() {
                                 </ProtectedRoute>
                             }
                         />
+                        <Route path="/admin/search" element={<AdminSearchPage />} />
+
+                        <Route
+                            path="/admin/businesses/:id"
+                            element={
+                                <ProtectedRoute allowedRole="super_admin">
+                                    <AdminBusinessDetailPage />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
+                            path="/admin/search"
+                            element={
+                                <ProtectedRoute allowedRole="super_admin">
+                                    <AdminSearchPage />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
+                            path="/admin/subscription-requests"
+                            element={
+                                <ProtectedRoute allowedRole="super_admin">
+                                    <AdminSubscriptionRequestsPage />
+                                </ProtectedRoute>
+                            }
+                        />
+
                     </Routes>
+
 
                 </main>
 

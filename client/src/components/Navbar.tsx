@@ -6,12 +6,41 @@ function Navbar() {
     const token = localStorage.getItem("token");
     const role = localStorage.getItem("role");
     const email = localStorage.getItem("email");
+    const isImpersonating = localStorage.getItem("impersonating") === "true";
 
     function handleLogout() {
         localStorage.removeItem("token");
         localStorage.removeItem("role");
         localStorage.removeItem("email");
         navigate("/login");
+    }
+    function handleReturnToAdmin() {
+        const adminReturnToken = localStorage.getItem("admin_return_token");
+        const adminReturnRole = localStorage.getItem("admin_return_role");
+        const adminReturnEmail = localStorage.getItem("admin_return_email");
+
+        if (!adminReturnToken || !adminReturnRole) {
+            localStorage.removeItem("token");
+            localStorage.removeItem("role");
+            localStorage.removeItem("email");
+            localStorage.removeItem("impersonating");
+            localStorage.removeItem("admin_return_token");
+            localStorage.removeItem("admin_return_role");
+            localStorage.removeItem("admin_return_email");
+            window.location.href = "/login";
+            return;
+        }
+
+        localStorage.setItem("token", adminReturnToken);
+        localStorage.setItem("role", adminReturnRole);
+        localStorage.setItem("email", adminReturnEmail || "");
+
+        localStorage.removeItem("impersonating");
+        localStorage.removeItem("admin_return_token");
+        localStorage.removeItem("admin_return_role");
+        localStorage.removeItem("admin_return_email");
+
+        window.location.href = "/admin";
     }
 
     const isLoggedIn = Boolean(token);
@@ -111,6 +140,14 @@ function Navbar() {
                             >
                                 Logout
                             </button>
+                            {isImpersonating && (
+                                <button
+                                    onClick={handleReturnToAdmin}
+                                    className="rounded-2xl bg-amber-500 px-4 py-2 font-semibold text-black hover:bg-amber-400"
+                                >
+                                    Return to Admin
+                                </button>
+                            )}
                         </>
                     ) : (
                         <div className="hidden rounded-2xl border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-400 sm:block">
