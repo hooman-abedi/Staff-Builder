@@ -1,12 +1,73 @@
 import { Link, useNavigate } from "react-router-dom";
+import {useState, useEffect} from "react";
 
 function Navbar() {
+    const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
     const navigate = useNavigate();
 
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL as string;
     const token = localStorage.getItem("token");
     const role = localStorage.getItem("role");
     const email = localStorage.getItem("email");
     const isImpersonating = localStorage.getItem("impersonating") === "true";
+
+    useEffect(() => {
+        async function loadUnreadNotificationsCount() {
+            try {
+                if (!token) {
+                    setUnreadNotificationsCount(0);
+                    return;
+                }
+
+                let endpoint: string | null = null;
+
+                if (role === "super_admin" || role === "support_admin") {
+                    endpoint = `${apiBaseUrl}/api/admin/notifications`;
+                } else if (role === "employer") {
+                    endpoint = `${apiBaseUrl}/api/notifications`;
+                }
+
+                if (!endpoint) {
+                    setUnreadNotificationsCount(0);
+                    return;
+                }
+
+                const res = await fetch(endpoint, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                    cache: "no-cache",
+                });
+
+                if (!res.ok) {
+                    return;
+                }
+
+                const data = await res.json();
+
+                const unreadCount = (data || []).filter(
+                    (notification: { is_read: boolean }) => !notification.is_read
+                ).length;
+
+                setUnreadNotificationsCount(unreadCount);
+            } catch (err) {
+                console.error("Load navbar unread notifications count error:", err);
+            }
+        }
+
+        function handleNotificationsUpdated() {
+            void loadUnreadNotificationsCount();
+        }
+
+        void loadUnreadNotificationsCount();
+        window.addEventListener("notifications-updated", handleNotificationsUpdated);
+
+        return () => {
+            window.removeEventListener("notifications-updated", handleNotificationsUpdated);
+        };
+    }, [apiBaseUrl, token, role]);
+
+
 
     function handleLogout() {
         localStorage.removeItem("token");
@@ -42,6 +103,29 @@ function Navbar() {
 
         window.location.href = "/admin";
     }
+    function handleLogoClick() {
+        if (!token) {
+            navigate("/");
+            return;
+        }
+
+        if (role === "super_admin" || role === "support_admin") {
+            navigate("/admin");
+            return;
+        }
+
+        if (role === "employer") {
+            navigate("/employer");
+            return;
+        }
+
+        if (role === "employee") {
+            navigate("/employee");
+            return;
+        }
+
+        navigate("/");
+    }
 
     const isLoggedIn = Boolean(token);
 
@@ -49,25 +133,38 @@ function Navbar() {
         <header className="sticky top-0 z-50 border-b border-slate-800 bg-slate-950/85 backdrop-blur">
             <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 md:px-10">
                 <div className="flex items-center gap-8">
-                    <Link to="/" className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-500/15 text-lg font-bold text-sky-300">
-                            SB
+                    <div
+                        onClick={handleLogoClick}
+                        className="flex items-center gap-3 cursor-pointer"
+                    >
+                        <div className="flex items-center gap-3">
+                            <img
+                                src="/logo.png"
+                                alt="Staff Builder Logo"
+                                className="h-10 w-10 object-contain"
+                            />
+                            <div className="flex flex-col leading-tight">
+        <span className="text-sm font-semibold tracking-wide">
+            STAFF BUILDER
+        </span>
+                                <span className="text-xs text-slate-400">
+            Training platform
+        </span>
+                            </div>
                         </div>
-                        <div>
-                            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-300">
-                                Staff Builder
-                            </p>
-                            <p className="text-xs text-slate-400">Training platform</p>
-                        </div>
-                    </Link>
+                    </div>
+
 
                     <nav className="hidden items-center gap-6 md:flex">
-                        <Link
-                            to="/"
-                            className="text-sm font-medium text-slate-300 transition hover:text-white"
-                        >
-                            Home
-                        </Link>
+                {!isLoggedIn && (
+                            <Link
+                                to="/"
+                                className="text-sm font-medium text-slate-300 transition hover:text-white"
+                            >
+                                Home
+                            </Link>
+                        )}
+
 
                         {!isLoggedIn && (
                             <>
@@ -77,6 +174,7 @@ function Navbar() {
                                 >
                                     Login
                                 </Link>
+
                                 <Link
                                     to="/register"
                                     className="text-sm font-medium text-slate-300 transition hover:text-white"
@@ -125,11 +223,59 @@ function Navbar() {
                         )}
                     </nav>
                 </div>
+                {isLoggedIn && (role === "super_admin" || role === "support_admin") && (
+                    <>
+                        <Link
+                            to="/admin"
+                            className="text-sm font-medium text-slate-300 transition hover:text-white"
+                        >
+                            Admin Home
+                        </Link>
+
+                        <Link
+                            to="/admin/businesses"
+                            className="text-sm font-medium text-slate-300 transition hover:text-white"
+                        >
+                            Businesses
+                        </Link>
+
+                        <Link
+                            to="/admin/users"
+                            className="text-sm font-medium text-slate-300 transition hover:text-white"
+                        >
+                            Users
+                        </Link>
+
+                        <Link
+                            to="/admin/search"
+                            className="text-sm font-medium text-slate-300 transition hover:text-white"
+                        >
+                            Search
+                        </Link>
+
+                        <Link
+                            to="/admin/subscription-requests"
+                            className="text-sm font-medium text-slate-300 transition hover:text-white"
+                        >
+                            Requests
+                        </Link>
+
+                        {role === "super_admin" && (
+                            <Link
+                                to="/admin/create-admin"
+                                className="text-sm font-medium text-slate-300 transition hover:text-white"
+                            >
+                                Create Admin
+                            </Link>
+                        )}
+                    </>
+                )}
 
                 <div className="flex items-center gap-3">
                     {isLoggedIn ? (
                         <>
-                            <div className="hidden rounded-2xl border border-slate-800 bg-slate-900 px-4 py-2 text-right sm:block">
+                            <div
+                                className="hidden rounded-2xl border border-slate-800 bg-slate-900 px-4 py-2 text-right sm:block">
                                 <p className="text-xs uppercase tracking-wide text-slate-500">{role}</p>
                                 <p className="max-w-[220px] truncate text-sm text-slate-200">{email}</p>
                             </div>
@@ -140,6 +286,19 @@ function Navbar() {
                             >
                                 Logout
                             </button>
+                            <button
+                                onClick={() => navigate("/notifications")}
+                                className="relative rounded-xl border border-slate-700 px-3 py-2 text-white hover:bg-slate-800"
+                            >
+                                🔔
+
+                                {unreadNotificationsCount > 0 && (
+                                    <span
+                                        className="absolute -right-2 -top-2 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
+            {unreadNotificationsCount}
+        </span>
+                                )}
+                            </button>
                             {isImpersonating && (
                                 <button
                                     onClick={handleReturnToAdmin}
@@ -148,11 +307,14 @@ function Navbar() {
                                     Return to Admin
                                 </button>
                             )}
+
                         </>
                     ) : (
-                        <div className="hidden rounded-2xl border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-400 sm:block">
+                        <div
+                            className="hidden rounded-2xl border border-slate-800 bg-slate-900 px-4 py-2 text-sm text-slate-400 sm:block">
                             Not logged in
                         </div>
+
                     )}
                 </div>
             </div>

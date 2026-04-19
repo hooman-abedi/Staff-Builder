@@ -82,7 +82,7 @@ router.put("/business/subscription", requireAuth, async (req, res) => {
         console.log("SUBSCRIPTION UPDATE BODY:", req.body);
         console.log("SUBSCRIPTION UPDATE USER:", req.user);
 
-        if (req.user.role !== "employer") {
+        if (req.user.role !== "employer" && req.user.role !== "employee") {
             return res.status(403).json({ message: "Access denied" });
         }
 
@@ -130,7 +130,7 @@ router.put("/business/subscription", requireAuth, async (req, res) => {
 
 router.get("/subscription-requests/me", requireAuth, async (req, res) => {
     try {
-        if (req.user.role !== "employer") {
+        if (req.user.role !== "employer" && req.user.role !== "employee") {
             return res.status(403).json({ message: "Access denied" });
         }
 
@@ -154,6 +154,7 @@ router.get("/subscription-requests/me", requireAuth, async (req, res) => {
             [req.user.businessId]
         );
 
+        res.set("Cache-Control", "no-store");
         res.json(result.rows);
     } catch (err) {
         console.error("Get employer subscription requests error:", err);
@@ -163,7 +164,7 @@ router.get("/subscription-requests/me", requireAuth, async (req, res) => {
 
 router.post("/subscription-requests", requireAuth, async (req, res) => {
     try {
-        if (req.user.role !== "employer") {
+        if (req.user.role !== "employer" && req.user.role !== "employee") {
             return res.status(403).json({ message: "Access denied" });
         }
 
@@ -258,5 +259,69 @@ router.post("/subscription-requests", requireAuth, async (req, res) => {
         res.status(500).json({ message: "Internal Server Error" });
     }
 });
+router.get("/notifications", requireAuth, async (req, res) => {
+    try {
+        if (req.user.role !== "employer" && req.user.role !== "employee") {
+            return res.status(403).json({ message: "Access denied" });
+        }
 
+        const result = await pool.query(
+            `
+            SELECT
+                id,
+                user_id,
+                type,
+                title,
+                message,
+                is_read,
+                related_business_id,
+                related_request_id,
+                created_at
+            FROM notifications
+            WHERE user_id = $1
+            ORDER BY created_at DESC
+            LIMIT 20
+            `,
+            [req.user.userId]
+        );
+
+        res.json(result.rows);
+    } catch (err) {
+        console.error("Employer notifications list error:", err);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+});
+router.put("/notifications/:id/read", requireAuth, async (req, res) => {
+    try {
+        if (req.user.role !== "employer" && req.user.role !== "employee") {
+            return res.status(403).json({ message: "Access denied" });
+        }
+
+        const notificationId = Number(req.params.id);
+
+        if (Number.isNaN(notificationId)) {
+            return res.status(400).json({ message: "Invalid notification id" });
+        }
+
+        const result = await pool.query(
+            `
+            UPDATE notifications
+            SET is_read = true
+            WHERE id = $1
+              AND user_id = $2
+            RETURNING *
+            `,
+            [notificationId, req.user.userId]
+        );
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ message: "Notification not found" });
+        }
+
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error("Employer mark notification as read error:", err);
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+});
 module.exports = router;

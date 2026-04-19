@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -68,9 +69,9 @@ function LoginPage() {
             } else if (data.user.role === "employee") {
                 navigate("/employee");
             } else if (data.user.role === "super_admin") {
-                navigate("/admin/businesses");
+                navigate("/admin");
             } else if (data.user.role === "support_admin") {
-                navigate("/admin/users");
+                navigate("/admin");
             } else {
                 setError("Unknown account role.");
             }
@@ -83,6 +84,7 @@ function LoginPage() {
     }
 
     return (
+        
         <div className="min-h-[calc(100vh-160px)] bg-slate-950 px-6 py-14 text-white md:px-10">
             <div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-2">
                 <div>
@@ -139,6 +141,8 @@ function LoginPage() {
                                 <option value="employer">Employer</option>
                                 <option value="employee">Employee</option>
                                 <option value="super_admin">Super Admin</option>
+                                <option value="support_admin">Support Admin</option>
+
                             </select>
                         </div>
 

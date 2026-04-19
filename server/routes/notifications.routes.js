@@ -25,6 +25,7 @@ router.get("/notifications", requireAuth, async (req, res) => {
             [req.user.userId]
         );
 
+        res.set("Cache-Control", "no-store");
         res.json(result.rows);
     } catch (err) {
         console.error("Get notifications error:", err);

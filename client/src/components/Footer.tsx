@@ -58,7 +58,7 @@ function Footer() {
                                 </Link>
                             </li>
                             <li>
-                                <Link to="/" className="transition hover:text-white">
+                                <Link to="/contact" className="transition hover:text-white">
                                     Contact
                                 </Link>
                             </li>
@@ -76,17 +76,17 @@ function Footer() {
                         </h3>
                         <ul className="mt-4 space-y-3 text-sm text-slate-400">
                             <li>
-                                <Link to="/" className="transition hover:text-white">
+                                <Link to="/privacy" className="transition hover:text-white">
                                     Privacy
                                 </Link>
                             </li>
                             <li>
-                                <Link to="/" className="transition hover:text-white">
+                                <Link to="/terms" className="transition hover:text-white">
                                     Terms
                                 </Link>
                             </li>
                             <li>
-                                <Link to="/" className="transition hover:text-white">
+                                <Link to="/support" className="transition hover:text-white">
                                     Support
                                 </Link>
                             </li>

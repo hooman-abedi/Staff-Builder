@@ -22,6 +22,49 @@ function AdminHomePage() {
     const [pendingSubscriptionRequests, setPendingSubscriptionRequests] = useState(0);
     const [notifications, setNotifications] = useState<AdminNotification[]>([]);
 
+    const [newAdminName, setNewAdminName] = useState("");
+    const [newAdminEmail, setNewAdminEmail] = useState("");
+    const [newAdminPassword, setNewAdminPassword] = useState("");
+    const [adminCreateMessage, setAdminCreateMessage] = useState("");
+
+    async function createSupportAdmin(e: React.FormEvent) {
+        e.preventDefault();
+
+        try {
+            setAdminCreateMessage("");
+
+            const token = localStorage.getItem("token");
+
+            const res = await fetch(`${apiBaseUrl}/api/admin/create-support-admin`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    full_name: newAdminName,
+                    email: newAdminEmail,
+                    password: newAdminPassword,
+                }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                setAdminCreateMessage(data.message || "Failed to create support admin");
+                return;
+            }
+
+            setAdminCreateMessage(`Support admin created: ${data.email}`);
+            setNewAdminName("");
+            setNewAdminEmail("");
+            setNewAdminPassword("");
+        } catch (err) {
+            console.error("Create support admin error:", err);
+            setAdminCreateMessage("Something went wrong while creating support admin");
+        }
+    }
+
 
     useEffect(() => {
         const token = localStorage.getItem("token");
@@ -271,6 +314,70 @@ function AdminHomePage() {
                             Use these tools to monitor businesses, inspect users, and review platform actions.
                         </p>
                     </section>
+
+                    <button
+                        onClick={() => navigate("/admin/users/active")}
+                        className="rounded-2xl border border-slate-700 px-5 py-3 font-semibold text-white transition hover:border-slate-500 hover:bg-slate-800"
+                    >
+                        Active Users
+                    </button>
+
+                    <button
+                        onClick={() => navigate("/admin/users/inactive")}
+                        className="rounded-2xl border border-slate-700 px-5 py-3 font-semibold text-white transition hover:border-slate-500 hover:bg-slate-800"
+                    >
+                        Inactive Users
+                    </button>
+
+                    {role === "super_admin" && (
+                        <section className="mt-8 rounded-3xl border border-slate-800 bg-slate-900/80 p-6">
+                            <h2 className="text-2xl font-semibold text-white">Create Support Admin</h2>
+                            <p className="mt-1 text-sm text-slate-400">
+                                Super admins can create support admins for internal platform management.
+                            </p>
+
+                            {adminCreateMessage && (
+                                <div
+                                    className="mt-4 rounded-2xl border border-sky-500/30 bg-sky-500/10 px-4 py-3 text-sm text-sky-200">
+                                    {adminCreateMessage}
+                                </div>
+                            )}
+
+                            <form onSubmit={createSupportAdmin} className="mt-4 grid gap-4 md:grid-cols-3">
+                                <input
+                                    value={newAdminName}
+                                    onChange={(e) => setNewAdminName(e.target.value)}
+                                    placeholder="Full name"
+                                    className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-sky-400"
+                                />
+
+                                <input
+                                    value={newAdminEmail}
+                                    onChange={(e) => setNewAdminEmail(e.target.value)}
+                                    placeholder="Email"
+                                    className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-sky-400"
+                                />
+
+                                <input
+                                    type="password"
+                                    value={newAdminPassword}
+                                    onChange={(e) => setNewAdminPassword(e.target.value)}
+                                    placeholder="Temporary password"
+                                    className="rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-sky-400"
+                                />
+
+                                <div className="md:col-span-3">
+                                    <button
+                                        type="submit"
+                                        className="rounded-2xl bg-sky-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-sky-400"
+                                    >
+                                        Create Support Admin
+                                    </button>
+                                </div>
+                            </form>
+                        </section>
+                    )}
+
                     <section className="mt-8 rounded-3xl border border-slate-800 bg-slate-900/80 p-6">
                         <h2 className="text-2xl font-semibold text-white">Recent Notifications</h2>
                         <p className="mt-1 text-sm text-slate-400">

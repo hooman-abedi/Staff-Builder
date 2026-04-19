@@ -23,6 +23,14 @@ import AdminUsersPage from "./pages/admin/AdminUsersPage";
 import AdminSearchPage from "./pages/admin/AdminSearchPage";
 import AdminBusinessDetailPage from "./pages/admin/AdminBusinessDetailPage";
 import AdminSubscriptionRequestsPage from "./pages/admin/AdminSubscriptionRequestsPage";
+import NotificationsPage from "./pages/NotificationsPage";
+import AdminActiveUsersPage from "./pages/admin/AdminActiveUsersPage";
+import AdminInactiveUsersPage from "./pages/admin/AdminInactiveUsersPage";
+import SupportPage from "./pages/SupportPage";
+import ContactPage from "./pages/ContactPage";
+import TermsPage from "./pages/TermsPage";
+import PrivacyPage from "./pages/PrivacyPage";
+import AdminCreateSupportAdminPage from "./pages/admin/AdminCreateSupportAdminPage";
 
 function App() {
     return (
@@ -40,7 +48,7 @@ function App() {
                         <Route
                             path="/employer"
                             element={
-                                <ProtectedRoute allowedRole="employer">
+                                <ProtectedRoute allowedRoles={["employer"]}>
                                     <EmployerHomePage />
                                 </ProtectedRoute>
                             }
@@ -49,7 +57,7 @@ function App() {
                         <Route
                             path="/employer/employees"
                             element={
-                                <ProtectedRoute allowedRole="employer">
+                                <ProtectedRoute allowedRoles={["employer"]}>
                                     <EmployerEmployeesPage />
                                 </ProtectedRoute>
                             }
@@ -58,7 +66,7 @@ function App() {
                         <Route
                             path="/employer/training"
                             element={
-                                <ProtectedRoute allowedRole="employer">
+                                <ProtectedRoute allowedRoles={["employer"]}>
                                     <EmployerTrainingPage />
                                 </ProtectedRoute>
                             }
@@ -67,7 +75,7 @@ function App() {
                         <Route
                             path="/employer/progress"
                             element={
-                                <ProtectedRoute allowedRole="employer">
+                                <ProtectedRoute allowedRoles={["employer"]}>
                                     <EmployerProgressPage />
                                 </ProtectedRoute>
                             }
@@ -76,7 +84,7 @@ function App() {
                         <Route
                             path="/employee"
                             element={
-                                <ProtectedRoute allowedRole="employee">
+                                <ProtectedRoute allowedRoles={["employee"]}>
                                     <EmployeeDashboard />
                                 </ProtectedRoute>
                             }
@@ -85,7 +93,7 @@ function App() {
                         <Route
                             path="/employer/training/category/:id"
                             element={
-                                <ProtectedRoute allowedRole="employer">
+                                <ProtectedRoute allowedRoles={["employer"]}>
                                     <EmployerCategoryPage />
                                 </ProtectedRoute>
                             }
@@ -94,7 +102,7 @@ function App() {
                         <Route
                             path="/employer/training/folder/:id"
                             element={
-                                <ProtectedRoute allowedRole="employer">
+                                <ProtectedRoute allowedRoles={["employer"]}>
                                     <EmployerFolderPage />
                                 </ProtectedRoute>
                             }
@@ -102,7 +110,7 @@ function App() {
                         <Route
                             path="/employee/category/:id"
                             element={
-                                <ProtectedRoute allowedRole="employee">
+                                <ProtectedRoute allowedRoles={["employee"]}>
                                     <EmployeeCategoryPage />
                                 </ProtectedRoute>
                             }
@@ -111,7 +119,7 @@ function App() {
                         <Route
                             path="/employee/folder/:id"
                             element={
-                                <ProtectedRoute allowedRole="employee">
+                                <ProtectedRoute allowedRoles={["employee"]}>
                                     <EmployeeFolderPage />
                                 </ProtectedRoute>
                             }
@@ -119,7 +127,7 @@ function App() {
                         <Route
                             path="/employee/video/:id"
                             element={
-                                <ProtectedRoute allowedRole="employee">
+                                <ProtectedRoute allowedRoles={["employee"]}>
                                     <EmployeeVideoPage />
                                 </ProtectedRoute>
                             }
@@ -128,7 +136,7 @@ function App() {
                         <Route
                             path="/admin"
                             element={
-                                <ProtectedRoute allowedRole="super_admin">
+                                <ProtectedRoute allowedRoles={["super_admin", "support_admin"]}>
                                     <AdminHomePage />
                                 </ProtectedRoute>
                             }
@@ -136,7 +144,7 @@ function App() {
                         <Route
                             path="/admin/businesses"
                             element={
-                                <ProtectedRoute allowedRole="super_admin">
+                                <ProtectedRoute allowedRoles={["super_admin", "support_admin"]}>
                                     <AdminBusinessesPage />
                                 </ProtectedRoute>
                             }
@@ -145,7 +153,7 @@ function App() {
                         <Route
                             path="/admin/users"
                             element={
-                                <ProtectedRoute allowedRole="super_admin">
+                                <ProtectedRoute allowedRoles={["super_admin", "support_admin"]}>
                                     <AdminUsersPage />
                                 </ProtectedRoute>
                             }
@@ -155,7 +163,7 @@ function App() {
                         <Route
                             path="/admin/businesses/:id"
                             element={
-                                <ProtectedRoute allowedRole="super_admin">
+                                <ProtectedRoute allowedRoles={["super_admin", "support_admin"]}>
                                     <AdminBusinessDetailPage />
                                 </ProtectedRoute>
                             }
@@ -163,7 +171,7 @@ function App() {
                         <Route
                             path="/admin/search"
                             element={
-                                <ProtectedRoute allowedRole="super_admin">
+                                <ProtectedRoute allowedRoles={["super_admin", "support_admin"]}>
                                     <AdminSearchPage />
                                 </ProtectedRoute>
                             }
@@ -171,8 +179,38 @@ function App() {
                         <Route
                             path="/admin/subscription-requests"
                             element={
-                                <ProtectedRoute allowedRole="super_admin">
+                                <ProtectedRoute allowedRoles={["super_admin", "support_admin"]}>
                                     <AdminSubscriptionRequestsPage />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route path="/notifications" element={<NotificationsPage />} />
+                        <Route
+                            path="/admin/users/active"
+                            element={
+                                <ProtectedRoute allowedRoles={["super_admin", "support_admin"]}>
+                                    <AdminActiveUsersPage />
+                                </ProtectedRoute>
+                            }
+                        />
+
+                        <Route
+                            path="/admin/users/inactive"
+                            element={
+                                <ProtectedRoute allowedRoles={["super_admin", "support_admin"]}>
+                                    <AdminInactiveUsersPage />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route path="/support" element={<SupportPage />} />
+                        <Route path="/contact" element={<ContactPage />} />
+                        <Route path="/terms" element={<TermsPage />} />
+                        <Route path="/privacy" element={<PrivacyPage />} />
+                        <Route
+                            path="/admin/create-admin"
+                            element={
+                                <ProtectedRoute allowedRoles={["super_admin"]}>
+                                    <AdminCreateSupportAdminPage />
                                 </ProtectedRoute>
                             }
                         />

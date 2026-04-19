@@ -1,19 +1,21 @@
 import { Navigate } from "react-router-dom";
 
+type Role = "employer" | "employee" | "super_admin" | "support_admin";
+
 type ProtectedRouteProps = {
+    allowedRoles: Role[];
     children: React.ReactNode;
-    allowedRole: "employer" | "employee" | "super_admin" | "support_admin";
 };
 
-function ProtectedRoute({ children, allowedRole }: ProtectedRouteProps) {
+function ProtectedRoute({ allowedRoles, children }: ProtectedRouteProps) {
     const token = localStorage.getItem("token");
-    const role = localStorage.getItem("role");
+    const role = localStorage.getItem("role") as Role | null;
 
-    if (!token) {
+    if (!token || !role) {
         return <Navigate to="/login" replace />;
     }
 
-    if (role !== allowedRole) {
+    if (!allowedRoles.includes(role)) {
         return <Navigate to="/login" replace />;
     }
 

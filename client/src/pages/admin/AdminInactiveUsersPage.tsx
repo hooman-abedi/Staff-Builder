@@ -27,11 +27,6 @@ function AdminUsersPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [roleFilter, setRoleFilter] = useState<"all" | "employer" | "employee" | "super_admin" | "support_admin">("all");
 
-    const [editingUserId, setEditingUserId] = useState<number | null>(null);
-    const [editFullName, setEditFullName] = useState("");
-    const [editEmail, setEditEmail] = useState("");
-    const [editRole, setEditRole] = useState<"employee" | "employer" | "super_admin" | "support_admin">("employee");
-
     function clearAuthAndRedirect() {
 
         localStorage.removeItem("token");
@@ -103,7 +98,7 @@ function AdminUsersPage() {
                 setError(data.message || "Failed to impersonate user");
                 return;
             }
-            
+
             const currentAdminToken = localStorage.getItem("token");
             const currentAdminRole = localStorage.getItem("role");
             const currentAdminEmail = localStorage.getItem("email");
@@ -220,95 +215,6 @@ function AdminUsersPage() {
             setError("Something went wrong while resetting password");
         }
     }
-    function startEditUser(user: AdminUser) {
-        setEditingUserId(user.id);
-        setEditFullName(user.full_name || "");
-        setEditEmail(user.email);
-        setEditRole(user.role as "employee" | "employer" | "super_admin" | "support_admin");
-    }
-
-    function cancelEditUser() {
-        setEditingUserId(null);
-        setEditFullName("");
-        setEditEmail("");
-        setEditRole("employee");
-    }
-
-    async function saveUserEdit(userId: number) {
-        try {
-            setError("");
-
-            const token = localStorage.getItem("token");
-
-            const res = await fetch(`${apiBaseUrl}/api/admin/users/${userId}`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    full_name: editFullName,
-                    email: editEmail,
-                    role: editRole,
-                }),
-            });
-
-            const data = await res.json();
-
-            if (res.status === 401) {
-                clearAuthAndRedirect();
-                return;
-            }
-
-            if (!res.ok) {
-                setError(data.message || "Failed to update user");
-                return;
-            }
-
-            setUsers((prev) =>
-                prev.map((user) => (user.id === userId ? { ...user, ...data } : user))
-            );
-
-            cancelEditUser();
-        } catch (err) {
-            console.error("Save user edit error:", err);
-            setError("Something went wrong while updating user");
-        }
-    }
-    async function deleteUser(userId: number) {
-        const confirmed = window.confirm("Are you sure you want to delete this user?");
-        if (!confirmed) return;
-
-        try {
-            setError("");
-
-            const token = localStorage.getItem("token");
-
-            const res = await fetch(`${apiBaseUrl}/api/admin/users/${userId}`, {
-                method: "DELETE",
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            });
-
-            const data = await res.json();
-
-            if (res.status === 401) {
-                clearAuthAndRedirect();
-                return;
-            }
-
-            if (!res.ok) {
-                setError(data.message || "Failed to delete user");
-                return;
-            }
-
-            setUsers((prev) => prev.filter((u) => u.id !== userId));
-        } catch (err) {
-            console.error("Delete user error:", err);
-            setError("Something went wrong while deleting user");
-        }
-    }
 
     useEffect(() => {
         const token = localStorage.getItem("token");
@@ -327,28 +233,8 @@ function AdminUsersPage() {
         loadUsers();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-    const filteredUsers = users.filter((user) => {
-        const matchesStatus =
-            statusFilter === "active"
-                ? user.is_active
-                : statusFilter === "inactive"
-                    ? !user.is_active
-                    : true;
 
-        const matchesRole =
-            roleFilter === "all" ? true : user.role === roleFilter;
-
-        const normalizedSearch = searchTerm.trim().toLowerCase();
-
-        const matchesSearch =
-            normalizedSearch === ""
-                ? true
-                : (user.full_name || "").toLowerCase().includes(normalizedSearch) ||
-                user.email.toLowerCase().includes(normalizedSearch) ||
-                (user.business_name || "").toLowerCase().includes(normalizedSearch);
-
-        return matchesStatus && matchesRole && matchesSearch;
-    });
+    const inactiveUsers = users.filter((user) => !user.is_active);
 
     return (
         <div className="min-h-[calc(100vh-160px)] bg-slate-950 px-6 py-14 text-white md:px-10">
@@ -363,10 +249,10 @@ function AdminUsersPage() {
 
                 <div className="mb-8">
                     <h1 className="text-4xl font-bold leading-tight md:text-5xl">
-                        All Users
+                        Inactive Users
                     </h1>
                     <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-300">
-                        View employers, employees, and internal platform users from one place.
+                        View all inactive platform users and reactivate accounts when needed..
                     </p>
                 </div>
 
@@ -403,7 +289,7 @@ function AdminUsersPage() {
 
                 {loading ? (
                     <p className="text-slate-300">Loading users...</p>
-                ) : filteredUsers.length === 0 ? (
+                ) : inactiveUsers.length === 0 ? (
                     <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 text-slate-400">
                         No users found.
                     </div>
@@ -462,54 +348,15 @@ function AdminUsersPage() {
                                 </tr>
                                 </thead>
                                 <tbody>
-                                {filteredUsers.map((user) => {
+                                {inactiveUsers.map((user) => {
 
                                     const isCurrentAdmin = user.email === currentAdminEmail;
                                     return (
                                         <tr key={user.id} className="border-b border-slate-800 last:border-b-0">
                                             <td className="px-4 py-3 text-white">{user.id}</td>
-                                            <td className="px-4 py-3 text-white">
-                                                {editingUserId === user.id ? (
-                                                    <input
-                                                        value={editFullName}
-                                                        onChange={(e) => setEditFullName(e.target.value)}
-                                                        className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white outline-none focus:border-sky-400"
-                                                    />
-                                                ) : (
-                                                    user.full_name || "-"
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3 text-slate-300">
-                                                {editingUserId === user.id ? (
-                                                    <input
-                                                        value={editEmail}
-                                                        onChange={(e) => setEditEmail(e.target.value)}
-                                                        className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white outline-none focus:border-sky-400"
-                                                    />
-                                                ) : (
-                                                    user.email
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-3 text-slate-300">
-                                                {editingUserId === user.id ? (
-                                                    <select
-                                                        value={editRole}
-                                                        onChange={(e) =>
-                                                            setEditRole(
-                                                                e.target.value as "employee" | "employer" | "super_admin" | "support_admin"
-                                                            )
-                                                        }
-                                                        className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white outline-none focus:border-sky-400"
-                                                    >
-                                                        <option value="employee">employee</option>
-                                                        <option value="employer">employer</option>
-                                                        <option value="support_admin">support_admin</option>
-                                                        <option value="super_admin">super_admin</option>
-                                                    </select>
-                                                ) : (
-                                                    user.role
-                                                )}
-                                            </td>
+                                            <td className="px-4 py-3 text-white">{user.full_name || "-"}</td>
+                                            <td className="px-4 py-3 text-slate-300">{user.email}</td>
+                                            <td className="px-4 py-3 text-slate-300">{user.role}</td>
                                             <td className="px-4 py-3 text-slate-300">
                                                 {user.business_name || "Internal Platform"}
                                             </td>
@@ -547,37 +394,6 @@ function AdminUsersPage() {
                                                     >
                                                         Reset Password
                                                     </button>
-                                                    {editingUserId === user.id ? (
-                                                        <>
-                                                            <button
-                                                                onClick={() => saveUserEdit(user.id)}
-                                                                className="rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs font-medium text-sky-300 transition hover:bg-sky-500/20"
-                                                            >
-                                                                Save
-                                                            </button>
-
-                                                            <button
-                                                                onClick={cancelEditUser}
-                                                                className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-medium text-white transition hover:border-slate-500 hover:bg-slate-800"
-                                                            >
-                                                                Cancel
-                                                            </button>
-                                                        </>
-                                                    ) : (
-                                                        <button
-                                                            onClick={() => startEditUser(user)}
-                                                            className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-300 transition hover:bg-amber-500/20"
-                                                        >
-                                                            Edit
-                                                        </button>
-
-                                                    )}
-                                                    <button
-                                                        onClick={() => deleteUser(user.id)}
-                                                        className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-medium text-red-300 transition hover:bg-red-500/20"
-                                                    >
-                                                        Delete
-                                                    </button>
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3">
@@ -604,6 +420,5 @@ function AdminUsersPage() {
         </div>
     );
 }
-
 
 export default AdminUsersPage;

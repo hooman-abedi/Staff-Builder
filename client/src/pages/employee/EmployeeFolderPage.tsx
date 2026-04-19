@@ -173,6 +173,7 @@ function EmployeeFolderPage() {
                 return;
             }
 
+            window.dispatchEvent(new Event("notifications-updated"));
             await loadPageData();
         } catch (err) {
             console.error("Mark complete error:", err);

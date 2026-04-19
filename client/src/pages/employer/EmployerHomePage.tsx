@@ -254,17 +254,24 @@ function EmployerHomePage() {
                             </div>
 
                             <div className="mt-6 flex flex-wrap gap-3">
-                                <button className="rounded-2xl bg-sky-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-sky-400">
+                                <button
+                                    onClick={() => navigate("/employer/training")}
+                                    className="rounded-2xl bg-sky-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-sky-400"
+                                >
                                     Manage Subscription
                                 </button>
 
-                                <button className="rounded-2xl border border-slate-700 bg-slate-900 px-5 py-3 font-semibold text-white transition hover:border-slate-500 hover:bg-slate-800">
+                                <button
+                                    onClick={() => navigate("/employer/business")}
+                                    className="rounded-2xl border border-slate-700 px-5 py-3 font-semibold text-white transition hover:border-slate-500 hover:bg-slate-800"
+                                >
                                     Edit Business Details
                                 </button>
                             </div>
                         </section>
 
-                        <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
+                        <section
+                            className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-sky-500/5">
                             <div className="mb-6">
                                 <h2 className="text-2xl font-semibold text-white">Quick Actions</h2>
                                 <p className="mt-1 text-sm text-slate-400">

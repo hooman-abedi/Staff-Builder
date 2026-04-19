@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { requireAuth, requireRole } = require("../middleware/auth");
 const pool = require("../db");
+const bcrypt = require("bcrypt");
 
 // GET all users across the platform
 router.get(
@@ -19,6 +20,7 @@ router.get(
                     u.full_name,
                     u.email,
                     u.role,
+                    u.is_active,
                     u.created_at
                 FROM users u
                 LEFT JOIN businesses b ON u.business_id = b.id
@@ -304,6 +306,7 @@ router.put(
             const userId = Number(req.params.id);
             const { is_active } = req.body;
 
+
             if (Number.isNaN(userId)) {
                 return res.status(400).json({ message: "Invalid user id" });
             }
@@ -312,6 +315,10 @@ router.put(
                 return res.status(400).json({
                     message: "is_active must be true or false",
                 });
+            }
+
+            if (req.user.userId === userId && is_active === false) {
+                return res.status(400).json({ message: "Admins cannot deactivate themselves" });
             }
 
             const result = await pool.query(
@@ -523,31 +530,31 @@ router.put(
             );
             await pool.query(
                 `
-    INSERT INTO notifications (
-        user_id,
-        type,
-        title,
-        message,
-        related_business_id,
-        related_request_id
-    )
-    VALUES ($1, $2, $3, $4, $5, $6)
-    `,
-                [
-                    requestRow.requested_by_user_id,
-                    action === "approve"
-                        ? "subscription_request_approved"
-                        : "subscription_request_rejected",
-                    action === "approve"
-                        ? "Subscription Request Approved"
-                        : "Subscription Request Rejected",
-                    action === "approve"
-                        ? `Your ${requestRow.requested_plan} subscription request was approved.`
-                        : `Your ${requestRow.requested_plan} subscription request was rejected.`,
-                    requestRow.business_id,
-                    requestRow.id,
-                ]
-            );
+        INSERT INTO notifications (
+            user_id,
+            type,
+            title,
+            message,
+            related_business_id,
+            related_request_id
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+        `,
+                    [
+                        requestRow.requested_by_user_id,
+                        action === "approve"
+                            ? "subscription_request_approved"
+                            : "subscription_request_rejected",
+                        action === "approve"
+                            ? "Subscription Request Approved"
+                            : "Subscription Request Rejected",
+                        action === "approve"
+                            ? `Your ${requestRow.requested_plan} subscription request was approved.`
+                            : `Your ${requestRow.requested_plan} subscription request was rejected.`,
+                        requestRow.business_id,
+                        requestRow.id,
+                    ]
+                );
 
             res.json(updateResult.rows[0]);
         } catch (err) {
@@ -621,6 +628,427 @@ router.put(
             res.json(result.rows[0]);
         } catch (err) {
             console.error("Mark notification as read error:", err);
+            res.status(500).json({ message: "Internal Server Error" });
+        }
+    }
+);
+router.put(
+    "/admin/users/:id/status",
+    requireAuth,
+    requireRole(["super_admin", "support_admin"]),
+    async (req, res) => {
+        try {
+            const userId = Number(req.params.id);
+            const { is_active } = req.body;
+
+            if (Number.isNaN(userId)) {
+                return res.status(400).json({ message: "Invalid user id" });
+            }
+
+            if (typeof is_active !== "boolean") {
+                return res.status(400).json({ message: "is_active must be true or false" });
+            }
+
+            const result = await pool.query(
+                `
+                UPDATE users
+                SET is_active = $1
+                WHERE id = $2
+                RETURNING id, business_id, full_name, email, role, is_active, created_at
+                `,
+                [is_active, userId]
+            );
+
+            if (result.rowCount === 0) {
+                return res.status(404).json({ message: "User not found" });
+            }
+
+            res.json(result.rows[0]);
+        } catch (err) {
+            console.error("Admin update user status error:", err);
+            res.status(500).json({ message: "Internal Server Error" });
+        }
+    }
+);
+
+router.put(
+    "/admin/users/:id/password",
+    requireAuth,
+    requireRole(["super_admin", "support_admin"]),
+    async (req, res) => {
+        try {
+            const userId = Number(req.params.id);
+            const { password } = req.body;
+
+            if (Number.isNaN(userId)) {
+                return res.status(400).json({ message: "Invalid user id" });
+            }
+
+            if (!password || typeof password !== "string" || password.length < 6) {
+                return res.status(400).json({
+                    message: "Password must be at least 6 characters long",
+                });
+            }
+
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            const result = await pool.query(
+                `
+                UPDATE users
+                SET password_hash = $1
+                WHERE id = $2
+                RETURNING id, email, full_name, role
+                `,
+                [hashedPassword, userId]
+            );
+
+            if (result.rowCount === 0) {
+                return res.status(404).json({ message: "User not found" });
+            }
+
+            res.json({
+                message: "Password updated successfully",
+                user: result.rows[0],
+            });
+        } catch (err) {
+            console.error("Admin update user password error:", err);
+            res.status(500).json({ message: "Internal Server Error" });
+        }
+    }
+);
+
+router.post(
+    "/admin/create-support-admin",
+    requireAuth,
+    requireRole(["super_admin"]),
+    async (req, res) => {
+        try {
+            const { full_name, email, password } = req.body;
+
+            if (!full_name || !email || !password) {
+                return res.status(400).json({
+                    message: "full_name, email, and password are required",
+                });
+            }
+
+            if (password.length < 6) {
+                return res.status(400).json({
+                    message: "Password must be at least 6 characters long",
+                });
+            }
+
+            const existingUser = await pool.query(
+                `
+                SELECT id
+                FROM users
+                WHERE email = $1
+                `,
+                [email.trim().toLowerCase()]
+            );
+
+            if (existingUser.rowCount > 0) {
+                return res.status(400).json({
+                    message: "A user with that email already exists",
+                });
+            }
+
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            const result = await pool.query(
+                `
+                INSERT INTO users (
+                    business_id,
+                    full_name,
+                    email,
+                    password_hash,
+                    role,
+                    is_active
+                )
+                VALUES ($1, $2, $3, $4, $5, $6)
+                RETURNING id, full_name, email, role, is_active, created_at
+                `,
+                [
+                    null,
+                    full_name.trim(),
+                    email.trim().toLowerCase(),
+                    hashedPassword,
+                    "support_admin",
+                    true,
+                ]
+            );
+
+            res.status(201).json(result.rows[0]);
+        } catch (err) {
+            console.error("Create support admin error:", err);
+            res.status(500).json({ message: "Internal Server Error" });
+        }
+    }
+);
+
+router.put(
+    "/admin/users/:id",
+    requireAuth,
+    requireRole(["super_admin", "support_admin"]),
+    async (req, res) => {
+        try {
+            const userId = Number(req.params.id);
+            const { full_name, email, role } = req.body;
+
+            if (Number.isNaN(userId)) {
+                return res.status(400).json({ message: "Invalid user id" });
+            }
+
+            if (!full_name || !email || !role) {
+                return res.status(400).json({
+                    message: "full_name, email, and role are required",
+                });
+            }
+
+            const allowedRoles = ["employee", "employer", "super_admin", "support_admin"];
+            if (!allowedRoles.includes(role)) {
+                return res.status(400).json({ message: "Invalid role" });
+            }
+
+            if (req.user.role !== "super_admin" && role === "super_admin") {
+                return res.status(403).json({
+                    message: "Only super admin can assign super admin role",
+                });
+            }
+
+            const existingUser = await pool.query(
+                `
+                SELECT id
+                FROM users
+                WHERE email = $1
+                  AND id <> $2
+                `,
+                [email.trim().toLowerCase(), userId]
+            );
+
+            if (existingUser.rowCount > 0) {
+                return res.status(400).json({
+                    message: "Another user with that email already exists",
+                });
+            }
+
+            const result = await pool.query(
+                `
+                UPDATE users
+                SET
+                    full_name = $1,
+                    email = $2,
+                    role = $3
+                WHERE id = $4
+                RETURNING
+                    id,
+                    business_id,
+                    full_name,
+                    email,
+                    role,
+                    is_active,
+                    created_at
+                `,
+                [full_name.trim(), email.trim().toLowerCase(), role, userId]
+            );
+
+            if (result.rowCount === 0) {
+                return res.status(404).json({ message: "User not found" });
+            }
+
+            res.json(result.rows[0]);
+        } catch (err) {
+            console.error("Admin update user error:", err);
+            res.status(500).json({ message: "Internal Server Error" });
+        }
+    }
+);
+router.delete(
+    "/admin/users/:id",
+    requireAuth,
+    requireRole(["super_admin", "support_admin"]),
+    async (req, res) => {
+        try {
+            const userId = Number(req.params.id);
+
+            if (Number.isNaN(userId)) {
+                return res.status(400).json({ message: "Invalid user id" });
+            }
+
+            // prevent admin from deleting themselves
+            if (userId === req.user.userId) {
+                return res.status(400).json({
+                    message: "You cannot delete your own account",
+                });
+            }
+
+            // get user info first
+            const userCheck = await pool.query(
+                `SELECT role FROM users WHERE id = $1`,
+                [userId]
+            );
+
+            if (userCheck.rowCount === 0) {
+                return res.status(404).json({ message: "User not found" });
+            }
+
+            const targetRole = userCheck.rows[0].role;
+
+            // only super_admin can delete super_admin
+            if (
+                targetRole === "super_admin" &&
+                req.user.role !== "super_admin"
+            ) {
+                return res.status(403).json({
+                    message: "Only super admin can delete another super admin",
+                });
+            }
+
+            await pool.query(`DELETE FROM users WHERE id = $1`, [userId]);
+
+            res.json({ message: "User deleted successfully" });
+        } catch (err) {
+            console.error("Delete user error:", err);
+            res.status(500).json({ message: "Internal Server Error" });
+        }
+    }
+);
+
+router.put(
+    "/admin/businesses/:id",
+    requireAuth,
+    requireRole(["super_admin", "support_admin"]),
+    async (req, res) => {
+        try {
+            const businessId = Number(req.params.id);
+            const {
+                name,
+                subscription_plan,
+                subscription_status,
+                max_employees,
+            } = req.body;
+
+            if (Number.isNaN(businessId)) {
+                return res.status(400).json({ message: "Invalid business id" });
+            }
+
+            if (!name || !subscription_plan || !subscription_status) {
+                return res.status(400).json({
+                    message: "name, subscription_plan, and subscription_status are required",
+                });
+            }
+
+            const parsedMaxEmployees = Number(max_employees);
+            if (!Number.isInteger(parsedMaxEmployees) || parsedMaxEmployees < 0) {
+                return res.status(400).json({
+                    message: "max_employees must be a non-negative integer",
+                });
+            }
+
+            const validPlans = ["free", "basic", "growth", "enterprise", "internal"];
+            const validStatuses = ["active", "inactive", "expired", "trial_active", "suspended"];
+
+            if (!validPlans.includes(subscription_plan)) {
+                return res.status(400).json({ message: "Invalid subscription plan" });
+            }
+
+            if (!validStatuses.includes(subscription_status)) {
+                return res.status(400).json({ message: "Invalid subscription status" });
+            }
+
+            const result = await pool.query(
+                `
+                UPDATE businesses
+                SET
+                    name = $1,
+                    subscription_plan = $2,
+                    subscription_status = $3,
+                    max_employees = $4
+                WHERE id = $5
+                RETURNING
+                    id,
+                    name,
+                    subscription_plan,
+                    subscription_status,
+                    trial_started_at,
+                    trial_ends_at,
+                    max_employees,
+                    subscription_started_at,
+                    subscription_ends_at,
+                    created_at
+                `,
+                [
+                    name.trim(),
+                    subscription_plan,
+                    subscription_status,
+                    parsedMaxEmployees,
+                    businessId,
+                ]
+            );
+
+            if (result.rowCount === 0) {
+                return res.status(404).json({ message: "Business not found" });
+            }
+
+            res.json(result.rows[0]);
+        } catch (err) {
+            console.error("Admin update business error:", err);
+            res.status(500).json({ message: "Internal Server Error" });
+        }
+    }
+);
+
+router.delete(
+    "/admin/businesses/:id",
+    requireAuth,
+    requireRole(["super_admin", "support_admin"]),
+    async (req, res) => {
+        try {
+            const businessId = Number(req.params.id);
+
+            if (Number.isNaN(businessId)) {
+                return res.status(400).json({ message: "Invalid business id" });
+            }
+
+            const businessCheck = await pool.query(
+                `
+                SELECT id, name
+                FROM businesses
+                WHERE id = $1
+                `,
+                [businessId]
+            );
+
+            if (businessCheck.rowCount === 0) {
+                return res.status(404).json({ message: "Business not found" });
+            }
+
+            const linkedUsers = await pool.query(
+                `
+                SELECT COUNT(*)::int AS count
+                FROM users
+                WHERE business_id = $1
+                `,
+                [businessId]
+            );
+
+            if (linkedUsers.rows[0].count > 0) {
+                return res.status(400).json({
+                    message:
+                        "Cannot delete this business while users are still assigned to it. Remove or reassign users first.",
+                });
+            }
+
+            await pool.query(
+                `
+                DELETE FROM businesses
+                WHERE id = $1
+                `,
+                [businessId]
+            );
+
+            res.json({ message: "Business deleted successfully" });
+        } catch (err) {
+            console.error("Admin delete business error:", err);
             res.status(500).json({ message: "Internal Server Error" });
         }
     }

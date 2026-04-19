@@ -8,6 +8,9 @@ router.post("/employee/completions", requireAuth, requireRole("employee"), async
     try {
         const { training_item_id } = req.body;
         const trainingItemId = Number(training_item_id);
+        console.log("EMPLOYEE COMPLETION HIT");
+        console.log("COMPLETION USER:", req.user);
+        console.log("COMPLETION TRAINING ITEM ID:", trainingItemId);
 
         if (!Number.isInteger(trainingItemId)) {
             return res.status(400).json({ message: "training_item_id must be a number" });
@@ -36,6 +39,62 @@ router.post("/employee/completions", requireAuth, requireRole("employee"), async
        RETURNING id, business_id, user_id, training_item_id, completed_at`,
             [req.user.businessId, req.user.userId, trainingItemId]
         );
+        console.log("COMPLETION INSERTED:", result.rows[0]);
+        await pool.query(
+            `
+    INSERT INTO notifications (
+        user_id,
+        type,
+        title,
+        message,
+        is_read,
+        created_at
+    )
+    VALUES ($1, $2, $3, $4, false, NOW())
+    `,
+            [
+                req.user.userId,
+                "training_completed",
+                "Training Completed",
+                "You successfully completed a training item.",
+            ]
+        );
+        // find employers in this business
+        const employers = await pool.query(
+            `
+    SELECT id
+    FROM users
+    WHERE business_id = $1
+      AND role = 'employer'
+    `,
+            [req.user.businessId]
+        );
+        for (const employer of employers.rows) {
+            await pool.query(
+                `
+        INSERT INTO notifications (
+            user_id,
+            type,
+            title,
+            message,
+            is_read,
+            created_at
+        )
+        VALUES ($1, $2, $3, $4, false, NOW())
+        `,
+                [
+                    employer.id,
+                    "employee_training_completed",
+                    "Employee Completed Training",
+                    "An employee has completed a training item.",
+                ]
+            );
+        }
+        console.log("TRAINING COMPLETION NOTIFICATION INSERTED");
+        if (global.io) {
+            global.io.emit("notifications-updated");
+        }
+
 
         res.status(201).json(result.rows[0]);
     } catch (err) {
