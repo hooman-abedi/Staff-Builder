@@ -1,73 +1,124 @@
-# React + TypeScript + Vite
+# Staff Builder – Custom Training Platform for Businesses
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## 📌 Overview
+Staff Builder is a full-stack web application that allows businesses and franchises to create, manage, and track customized employee training.
 
-Currently, two official plugins are available:
+Unlike generic training platforms, Staff Builder enables each business location to design training that reflects its own workflows, equipment, and operational needs.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## 🎯 Problem
+Franchises often rely on standardized training systems provided by a central organization. However, individual locations differ significantly based on facilities, staff roles, and resources.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+This leads to:
+- Inconsistent training
+- Poor employee onboarding
+- Lack of progress tracking
+- Inefficient manual processes
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 💡 Solution
+Staff Builder provides a flexible platform where employers can:
+- Create role-based training categories
+- Build folders and training materials (documents, videos, quizzes)
+- Assign training to employees
+- Track completion and performance in real time
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+---
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## 🧩 Features
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### 👨‍💼 Employer
+- Create and manage staff categories
+- Add employees and assign training
+- Upload training materials (files, videos)
+- Track employee progress and completions
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 👨‍🔧 Employee
+- View assigned categories
+- Access training content
+- Complete training items and quizzes
+- Track personal progress
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### 🛠️ Admin (Internal)
+- Manage users and businesses
+- System-level access for support and testing
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+---
+
+## 🏗️ Architecture
+
+- **Frontend:** React + TypeScript (Vite)
+- **Backend:** Node.js + Express
+- **Database:** PostgreSQL
+- **API:** RESTful endpoints
+- **Authentication:** Token-based (JWT-style)
+
+---
+
+## 🔄 Core Workflow
+
+1. Employer creates training content
+2. Data is sent via API to backend
+3. Backend validates and stores data in PostgreSQL
+4. Employees access assigned training
+5. Completion data is recorded and tracked
+6. Employer views updated progress
+
+---
+
+## 🧪 Testing
+
+The system includes:
+
+- Unit Testing (frontend + backend)
+- Integration Testing (API + UI)
+- End-to-End Workflow Testing
+- Role-Based Access Testing
+- Error Handling Testing
+- Manual Acceptance Testing
+
+Example:
+- Login validation
+- Dashboard rendering
+- Employee training flow
+- Protected route access
+
+---
+## 🔗 Demo Video
+
+Watch the full system demonstration:
+👉 https://youtu.be/E0OyoJqZLdw
+
+---
+## 💻 GitHub Repository
+https://github.com/hooman-abedi/Staff-Builder
+
+---
+## 👥 Team Members
+•	Hooman Abedi
+•	Amir Ghaffari
+
+---
+## 🔮 Future Improvements
+•	Payment system integration for subscriptions
+•	Email notification system
+•	Load and performance testing
+•	Real-time notifications
+•	Advanced analytics dashboard
+
+---
+## 🚀 How to Run
+
+```bash
+Backend
+cd server
+npm install
+npm run dev
+---
+FrontEnd
+```bash
+cd client
+npm install
+npm run dev
